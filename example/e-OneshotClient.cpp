@@ -2,8 +2,6 @@
 #include <fishnets/WebSocketClientSSLSettings.hpp>
 #include <fishnets/WebSocketSession.hpp>
 
-#include "RootCertificates.inl"
-
 #include <iostream>
 
 class OneshotSession final : public fishnets::WebSocketSession
@@ -36,6 +34,8 @@ class OneshotSession final : public fishnets::WebSocketSession
 
     std::string m_sent;
 };
+
+#include "RootCertificates.inl"
 
 int main()
 {

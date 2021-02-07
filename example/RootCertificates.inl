@@ -5,7 +5,7 @@
 namespace
 {
 
-std::vector<std::string> rootCertificates = {
+const std::vector<std::string> rootCertificates = {
         /*  This is the DigiCert Global Root CA
             CN = DigiCert High Assurance EV Root CA
             OU = www.digicert.com

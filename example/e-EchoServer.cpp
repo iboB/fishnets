@@ -52,9 +52,19 @@ fishnets::WebSocketSessionPtr makeSession()
     return std::make_shared<EchoServerSession>();
 }
 
+#include "ServerCertificate.inl"
+
 int main()
 {
-    fishnets::WebSocketServer server(makeSession, 7654, 3, nullptr);
+    fishnets::WebSocketServerSSLSettings* psslSettings = nullptr;
+
+    // fishnets::WebSocketServerSSLSettings sslSettings;
+    // sslSettings.certificate = certificate;
+    // sslSettings.privateKey = privateKey;
+    // sslSettings.tmpDH = tmpDH;
+    // psslSettings = &sslSettings;
+
+    fishnets::WebSocketServer server(makeSession, 7654, 3, psslSettings);
     while (true) std::this_thread::sleep_for(std::chrono::seconds(1));
     return 0;
 }
