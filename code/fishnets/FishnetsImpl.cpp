@@ -7,8 +7,9 @@
 //
 #include "WebSocketClient.hpp"
 #include "WebSocketServer.hpp"
+#include "WebSocketServerSSLSettings.hpp"
+
 #include "WebSocketSession.hpp"
-#include "SSLSettings.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
 
@@ -425,7 +426,7 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
 class Server
 {
 public:
-    Server(WebSocketSessionFactoryFunc sessionFactory, tcp::endpoint endpoint, int numThreads, SSLSettings* sslSettings)
+    Server(WebSocketSessionFactoryFunc sessionFactory, tcp::endpoint endpoint, int numThreads, WebSocketServerSSLSettings* sslSettings)
         : m_context(numThreads)
         , m_acceptor(m_context, endpoint)
         , m_sessionFactory(std::move(sessionFactory))
@@ -518,10 +519,10 @@ public:
 
     // only used for https
     // here we persist the strings provided by the user
-    SSLSettings m_sslSettings;
+    WebSocketServerSSLSettings m_sslSettings;
 };
 
-WebSocketServer::WebSocketServer(WebSocketSessionFactoryFunc sessionFactory, uint16_t port, int numThreads, SSLSettings* sslSettings)
+WebSocketServer::WebSocketServer(WebSocketSessionFactoryFunc sessionFactory, uint16_t port, int numThreads, WebSocketServerSSLSettings* sslSettings)
 {
     auto const address = tcp::v4();
     m_server.reset(new Server(std::move(sessionFactory), tcp::endpoint(address, port), numThreads, sslSettings));

@@ -14,13 +14,13 @@
 
 namespace fishnets
 {
-struct SSLSettings;
+struct WebSocketServerSSLSettings;
 class Server;
 
 class FISHNETS_API WebSocketServer
 {
 public:
-    WebSocketServer(WebSocketSessionFactoryFunc sessionFactory, uint16_t port, int numThreads = 1, SSLSettings* sslSettings = nullptr);
+    WebSocketServer(WebSocketSessionFactoryFunc sessionFactory, uint16_t port, int numThreads = 1, WebSocketServerSSLSettings* sslSettings = nullptr);
     ~WebSocketServer();
 
     WebSocketServer(const WebSocketServer&) = delete;

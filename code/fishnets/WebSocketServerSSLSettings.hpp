@@ -11,7 +11,7 @@
 
 namespace fishnets
 {
-struct SSLSettings
+struct WebSocketServerSSLSettings
 {
     // strings or files in pem format
 
