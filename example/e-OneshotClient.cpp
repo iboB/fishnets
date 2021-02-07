@@ -1,5 +1,8 @@
 #include <fishnets/WebSocketClient.hpp>
+#include <fishnets/WebSocketClientSSLSettings.hpp>
 #include <fishnets/WebSocketSession.hpp>
+
+#include "RootCertificates.inl"
 
 #include <iostream>
 
@@ -36,7 +39,9 @@ class OneshotSession final : public fishnets::WebSocketSession
 
 int main()
 {
-    //fishnets::WebSocketClient client(std::make_shared<OneshotSession>(), "echo.websocket.org", 443);
+    // fishnets::WebSocketClientSSLSettings sslSettings;
+    // sslSettings.customCertificates = rootCertificates;
+    // fishnets::WebSocketClient client(std::make_shared<OneshotSession>(), "echo.websocket.org", 443, &sslSettings);
     fishnets::WebSocketClient client(std::make_shared<OneshotSession>(), "localhost", 7654);
 
     return 0;
