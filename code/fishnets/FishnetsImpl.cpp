@@ -1,0 +1,520 @@
+// fishnets
+// Copyright (c) 2021 Borislav Stanimirov
+//
+// Distributed under the MIT Software License
+// See accompanying file LICENSE or copy at
+// https://opensource.org/licenses/MIT
+//
+#include "WebSocketClient.hpp"
+#include "WebSocketServer.hpp"
+#include "WebSocketSession.hpp"
+#include "SSLSettings.hpp"
+
+#define BOOST_BEAST_USE_STD_STRING_VIEW 1
+
+#include <boost/beast/core.hpp>
+#include <boost/beast/websocket.hpp>
+#include <boost/beast/ssl.hpp>
+#include <boost/asio/io_context_strand.hpp>
+
+#include "LoadRootCertificates.inl"
+
+#include <iostream>
+#include <cassert>
+#include <vector>
+#include <thread>
+#include <charconv>
+
+namespace net = boost::asio;
+namespace beast = boost::beast;
+using tcp = net::ip::tcp;
+
+namespace fishnets
+{
+
+class StrandHolder
+{
+public:
+    StrandHolder(net::io_context& ctx)
+        : strand(ctx)
+    {}
+    net::io_context::strand strand;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// session
+
+class SessionOwnerBase : public std::enable_shared_from_this<SessionOwnerBase>
+{
+public:
+    ~SessionOwnerBase()
+    {
+        m_session->closed();
+    }
+
+    // accept flow
+
+    virtual void accept() = 0;
+
+    // connect flow
+
+    virtual void connect(tcp::endpoint endpoint) = 0;
+
+    // connections
+
+    virtual void doClose(beast::websocket::close_code code) = 0;
+
+    void onClosed(beast::error_code e)
+    {
+        if (e) return failed(e, "close");
+    }
+
+    void onConnectionEstablished(beast::error_code e)
+    {
+        if (e) return failed(e, "establish");
+
+        m_session->opened(*this);
+
+        doRead();
+    }
+
+    // io
+
+    virtual void doRead() = 0;
+    void onRead(beast::error_code e, bool text)
+    {
+        if (e == beast::websocket::error::closed) return closed();
+        if (e) return failed(e, "read");
+
+        auto bufData = m_readBuf.cdata().data();
+        if (text)
+        {
+            m_session->wsReceivedText(std::string_view(static_cast<const char*>(bufData), m_readBuf.size()));
+        }
+        else
+        {
+            m_session->wsReceivedBinary(itlib::make_memory_view(static_cast<const uint8_t*>(bufData), m_readBuf.size()));
+        }
+
+        m_readBuf.clear();
+        doRead();
+    }
+
+    void write(bool text, net::const_buffer buf)
+    {
+        assert(!m_writing);
+        m_writing = true;
+        doWrite(text, buf);
+    }
+
+    virtual void doWrite(bool text, net::const_buffer buf) = 0;
+
+    void onWrite(beast::error_code e, size_t)
+    {
+        if (e) return failed(e, "write");
+        m_writing = false;
+        m_session->wsCompletedSend();
+    }
+
+    // util
+
+    void failed(beast::error_code e, const char* source)
+    {
+        std::cerr << source << " error: " << e.message() << '\n';
+    }
+
+    void closed()
+    {
+        std::cout << "session closed\n";
+    }
+
+    void setSession(WebSocketSessionPtr&& session)
+    {
+        m_sessionPayload = std::move(session);
+        m_session = m_sessionPayload.get();
+    }
+
+    beast::flat_buffer m_readBuf;
+    WebSocketSessionPtr m_sessionPayload;
+    WebSocketSession* m_session = nullptr; // quick access pointer
+
+    // only relevant when connecting
+    std::string m_host;
+
+    bool m_writing = false;
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// WebSocketSession
+
+WebSocketSession::WebSocketSession() = default;
+
+WebSocketSession::~WebSocketSession() = default;
+
+void WebSocketSession::opened(SessionOwnerBase& session)
+{
+    assert(!m_owner);
+    m_owner = &session;
+    wsOpened();
+}
+
+void WebSocketSession::closed()
+{
+    m_owner = nullptr;
+    wsClosed();
+}
+
+void WebSocketSession::postWSIOTask(std::function<void()> task)
+{
+    m_ioStrandHolder->strand.post(std::move(task));
+}
+
+void WebSocketSession::wsClose()
+{
+    if (!m_owner) return; // already closed
+    m_owner->doClose(beast::websocket::close_code::normal);
+}
+
+void WebSocketSession::wsSend(itlib::const_memory_view<uint8_t> binary)
+{
+    if (!m_owner)
+    {
+        std::cerr << "Ignore write on closed session\n";
+        return;
+    }
+
+    m_owner->write(false, net::buffer(binary.data(), binary.size()));
+}
+
+void WebSocketSession::wsSend(std::string_view text)
+{
+    if (!m_owner)
+    {
+        std::cerr << "Ignore write on closed session\n";
+        return;
+    }
+
+    m_owner->write(true, net::buffer(text));
+}
+
+namespace
+{
+
+template <typename WS>
+void setCommonServerOptions(WS& ws)
+{
+    ws.read_message_max(32 * 1024 * 1024);
+
+    ws.set_option(beast::websocket::stream_base::decorator([](beast::websocket::response_type& res) {
+        res.set(beast::http::field::server, std::string(BOOST_BEAST_VERSION_STRING) + " ws-server");
+    }));
+
+    ws.set_option(beast::websocket::stream_base::timeout::suggested(beast::role_type::server));
+}
+
+template <typename WS>
+class SessionOwnerT : public SessionOwnerBase
+{
+public:
+    SessionOwnerT(WS ws)
+        : m_ws(std::move(ws))
+    {}
+
+    WS m_ws;
+
+    std::shared_ptr<SessionOwnerT> shared_from_base()
+    {
+        return std::static_pointer_cast<SessionOwnerT>(shared_from_this());
+    }
+
+    void doClose(beast::websocket::close_code code) override final
+    {
+        m_ws.async_close(code, beast::bind_front_handler(&SessionOwnerBase::onClosed, shared_from_this()));
+    }
+
+    void onReadCB(beast::error_code e, size_t)
+    {
+        onRead(e, m_ws.got_text());
+    }
+
+    void doRead() override final
+    {
+        m_ws.async_read(m_readBuf, beast::bind_front_handler(&SessionOwnerT::onReadCB, shared_from_base()));
+    }
+
+    void doWrite(bool text, net::const_buffer buf) override final
+    {
+        m_ws.text(text);
+        m_ws.async_write(buf, beast::bind_front_handler(&SessionOwnerBase::onWrite, shared_from_this()));
+    }
+
+    // accept flow
+
+    // connect flow
+    void connect(tcp::endpoint endpoint) override final
+    {
+         beast::get_lowest_layer(m_ws).async_connect(endpoint,
+            beast::bind_front_handler(&SessionOwnerT::onConnectCB, shared_from_base()));
+    }
+
+    virtual void onConnectCB(beast::error_code e) = 0;
+
+    void onReadyForWSHandshake(beast::error_code e)
+    {
+        if (e) return failed(e, "ws connect");
+
+        // Set suggested timeout settings for the websocket
+        m_ws.set_option(beast::websocket::stream_base::timeout::suggested(beast::role_type::client));
+
+        // Set a decorator to change the User-Agent of the handshake
+        m_ws.set_option(beast::websocket::stream_base::decorator([](beast::websocket::request_type& req) {
+            req.set(beast::http::field::user_agent, std::string(BOOST_BEAST_VERSION_STRING) + " ws-client");
+        }));
+
+        m_ws.async_handshake(m_host, "/",
+            beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
+    }
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// session owners
+
+///////////////////////////////////////////////////////////////////////////////
+// http session owner
+
+using WSWS = beast::websocket::stream<tcp::socket>;
+class SessionOwnerWS final : public SessionOwnerT<WSWS>
+{
+public:
+    using Super = SessionOwnerT<WSWS>;
+
+    SessionOwnerWS(tcp::socket&& socket)
+        : Super(WSWS(std::move(socket)))
+    {
+        setCommonServerOptions(m_ws);
+    }
+
+    SessionOwnerWS(net::io_context& ctx)
+        : Super(WSWS(net::io_context::strand(ctx)))
+    {}
+
+    // accept flow
+    void accept() override
+    {
+        m_ws.async_accept(beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
+    }
+
+    // connect flow
+    void onConnectCB(beast::error_code e) override
+    {
+        onReadyForWSHandshake(e);
+    }
+};
+
+///////////////////////////////////////////////////////////////////////////////
+// https session owner
+
+using WSSSL = beast::websocket::stream<net::ssl::stream<tcp::socket>>;
+class SessionOwnerSSL final : public SessionOwnerT<WSSSL>
+{
+public:
+    using Super = SessionOwnerT<WSSSL>;
+
+    SessionOwnerSSL(tcp::socket&& socket, net::ssl::context& sslCtx)
+        : Super(WSSSL(std::move(socket), sslCtx))
+    {
+        setCommonServerOptions(m_ws);
+    }
+
+    SessionOwnerSSL(net::io_context& ctx, net::ssl::context& sslCtx)
+        : Super(WSSSL(net::io_context::strand(ctx), sslCtx))
+    {}
+
+    std::shared_ptr<SessionOwnerSSL> shared_from_base()
+    {
+        return std::static_pointer_cast<SessionOwnerSSL>(shared_from_this());
+    }
+
+    // accept flow
+    void accept() override
+    {
+        m_ws.next_layer().async_handshake(net::ssl::stream_base::server,
+            beast::bind_front_handler(&SessionOwnerSSL::onAcceptHandshake, shared_from_base()));
+    }
+
+    void onAcceptHandshake(beast::error_code e)
+    {
+        if (e) return failed(e, "accept");
+        m_ws.async_accept(beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
+    }
+
+    // connect flow
+    void onConnectCB(beast::error_code e) override
+    {
+        if (e) return failed(e, "connect");
+
+        // Set SNI Hostname (many hosts need this to handshake successfully)
+        if(!SSL_set_tlsext_host_name(m_ws.next_layer().native_handle(), m_host.c_str()))
+        {
+            e = beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category());
+            return failed(e, "connect");
+        }
+
+        m_ws.next_layer().async_handshake(net::ssl::stream_base::client,
+            beast::bind_front_handler(&SessionOwnerSSL::onReadyForWSHandshake, shared_from_base()));
+    }
+};
+
+} // anonymous namespace
+
+///////////////////////////////////////////////////////////////////////////////
+// client
+
+WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string& addr, uint16_t port, bool https)
+{
+    net::io_context ctx(1);
+    std::unique_ptr<net::ssl::context> sslContext;
+
+    {
+        tcp::resolver resolver{net::io_context::strand(ctx)};
+
+        char portstr[6] = {};
+        std::to_chars(portstr, portstr+6, port);
+        auto results = resolver.resolve(tcp::v4(), addr, portstr);
+        if (results.empty())
+        {
+            std::cerr << "Could not resolve " << addr << '\n';
+            return;
+        }
+
+        // init session and owner
+        std::shared_ptr<SessionOwnerBase> owner;
+        if (https)
+        {
+            sslContext.reset(new net::ssl::context(net::ssl::context::tlsv12_client));
+            boost::system::error_code ec;
+            LoadRootCertificates(*sslContext, ec);
+            if (ec)
+            {
+                std::cerr << "Could not load root certificates: " << ec.message() << '\n';
+                return;
+            }
+            owner = std::make_shared<SessionOwnerSSL>(ctx, *sslContext);
+        }
+        else
+        {
+            owner = std::make_shared<SessionOwnerWS>(ctx);
+        }
+
+        session->m_ioStrandHolder = std::make_unique<StrandHolder>(ctx);
+        owner->setSession(std::move(session));
+
+        // and initiate
+        owner->m_host = addr;
+        owner->m_host += ':';
+        owner->m_host += portstr;
+        owner->connect(results.begin()->endpoint());
+    }
+
+    ctx.run();
+}
+
+///////////////////////////////////////////////////////////////////////////////
+// server
+
+class Server
+{
+public:
+    Server(WebSocketSessionFactoryFunc sessionFactory, tcp::endpoint endpoint, int numThreads, SSLSettings* sslSettings)
+        : m_context(numThreads)
+        , m_acceptor(m_context, endpoint)
+        , m_sessionFactory(std::move(sessionFactory))
+    {
+        if (sslSettings)
+        {
+            m_sslContext.reset(new net::ssl::context(net::ssl::context::tlsv12));
+            m_sslContext->set_options(
+                net::ssl::context::default_workarounds |
+                net::ssl::context::no_sslv2 |
+                net::ssl::context::single_dh_use);
+
+            m_sslContext->use_certificate_chain(net::buffer(sslSettings->certificate));
+            m_sslContext->use_private_key(net::buffer(sslSettings->privateKey), net::ssl::context::file_format::pem);
+            m_sslContext->use_tmp_dh(net::buffer(sslSettings->tmpDH));
+        }
+
+        doAccept();
+        m_threads.reserve(size_t(numThreads));
+        for (int i = 0; i < numThreads; ++i)
+        {
+            m_threads.emplace_back([this]() { m_context.run(); });
+        }
+    }
+
+    ~Server()
+    {
+        m_context.stop();
+        for (auto& thread : m_threads)
+        {
+            thread.join();
+        }
+    }
+
+    void doAccept()
+    {
+        m_acceptor.async_accept(beast::bind_front_handler(&Server::onAccept, this));
+    }
+
+    void onAccept(beast::error_code e, tcp::socket socket)
+    {
+        if (e)
+        {
+            std::cerr << "onAccept error: " << e << '\n';
+            return;
+        }
+
+        // init session and owner
+        std::shared_ptr<SessionOwnerBase> owner;
+        if (m_sslContext)
+        {
+            owner = std::make_shared<SessionOwnerSSL>(std::move(socket), *m_sslContext);
+        }
+        else
+        {
+            owner = std::make_shared<SessionOwnerWS>(std::move(socket));
+        }
+        auto session = m_sessionFactory();
+        session->m_ioStrandHolder = std::make_unique<StrandHolder>(m_context);
+        owner->setSession(std::move(session));
+
+        // and initiate
+        owner->accept();
+
+        // accept more sessions
+        doAccept();
+    }
+
+    net::io_context m_context;
+    std::unique_ptr<net::ssl::context> m_sslContext;
+
+    tcp::acceptor m_acceptor;
+
+    std::vector<std::thread> m_threads;
+
+    WebSocketSessionFactoryFunc m_sessionFactory;
+
+    // only used for https
+    std::string m_certificateChain;
+    std::string m_privateKey;
+    std::string m_tmpDh;
+};
+
+WebSocketServer::WebSocketServer(WebSocketSessionFactoryFunc sessionFactory, uint16_t port, int numThreads, SSLSettings* sslSettings)
+{
+    auto const address = tcp::v4();
+    m_server.reset(new Server(std::move(sessionFactory), tcp::endpoint(address, port), numThreads, sslSettings));
+}
+
+WebSocketServer::~WebSocketServer() = default;
+
+} // namespace vws
