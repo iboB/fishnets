@@ -7,15 +7,21 @@
 //
 #pragma once
 
-#include <string_view>
+#include <string>
 
 namespace fishnets
 {
 struct SSLSettings
 {
-    // all must be in pem format
-    std::string_view certificate;
-    std::string_view privateKey;
-    std::string_view tmpDH;
+    // strings or files in pem format
+
+    std::string certificate;
+    std::string certificateFile; // only if certificate is empty
+
+    std::string privateKey;
+    std::string privateKeyFile; // only if private key is empty
+
+    std::string tmpDH;
+    std::string tmpDHFile;  // only if private key is empty
 };
 }

@@ -432,15 +432,28 @@ public:
     {
         if (sslSettings)
         {
+            m_sslSettings = *sslSettings;
+
             m_sslContext.reset(new net::ssl::context(net::ssl::context::tlsv12));
             m_sslContext->set_options(
                 net::ssl::context::default_workarounds |
                 net::ssl::context::no_sslv2 |
                 net::ssl::context::single_dh_use);
 
-            m_sslContext->use_certificate_chain(net::buffer(sslSettings->certificate));
-            m_sslContext->use_private_key(net::buffer(sslSettings->privateKey), net::ssl::context::file_format::pem);
-            m_sslContext->use_tmp_dh(net::buffer(sslSettings->tmpDH));
+            if (m_sslSettings.certificate.empty())
+                m_sslContext->use_certificate_chain_file(m_sslSettings.certificateFile);
+            else
+                m_sslContext->use_certificate_chain(net::buffer(m_sslSettings.certificate));
+
+            if (m_sslSettings.privateKey.empty())
+                m_sslContext->use_private_key_file(m_sslSettings.privateKeyFile, net::ssl::context::file_format::pem);
+            else
+                m_sslContext->use_private_key(net::buffer(m_sslSettings.privateKey), net::ssl::context::file_format::pem);
+
+            if (m_sslSettings.tmpDH.empty())
+                m_sslContext->use_tmp_dh_file(m_sslSettings.tmpDHFile);
+            else
+                m_sslContext->use_tmp_dh(net::buffer(m_sslSettings.tmpDH));
         }
 
         doAccept();
@@ -504,9 +517,8 @@ public:
     WebSocketSessionFactoryFunc m_sessionFactory;
 
     // only used for https
-    std::string m_certificateChain;
-    std::string m_privateKey;
-    std::string m_tmpDh;
+    // here we persist the strings provided by the user
+    SSLSettings m_sslSettings;
 };
 
 WebSocketServer::WebSocketServer(WebSocketSessionFactoryFunc sessionFactory, uint16_t port, int numThreads, SSLSettings* sslSettings)
