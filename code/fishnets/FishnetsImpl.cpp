@@ -373,7 +373,7 @@ public:
 WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string& addr, uint16_t port, WebSocketClientSSLSettings* sslSettings)
 {
     net::io_context ctx(1);
-    std::unique_ptr<net::ssl::context> sslContext;
+    std::unique_ptr<net::ssl::context> sslCtx;
 
     {
         tcp::resolver resolver{net::io_context::strand(ctx)};
@@ -391,11 +391,11 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
         std::shared_ptr<SessionOwnerBase> owner;
         if (sslSettings)
         {
-            sslContext.reset(new net::ssl::context(net::ssl::context::tlsv12_client));
+            sslCtx.reset(new net::ssl::context(net::ssl::context::tlsv12_client));
             boost::system::error_code ec;
             for (auto& cert : sslSettings->customCertificates)
             {
-                sslContext->add_certificate_authority(boost::asio::buffer(cert), ec);
+                sslCtx->add_certificate_authority(boost::asio::buffer(cert), ec);
                 if (ec) break;
             }
             if (ec)
@@ -403,7 +403,7 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
                 std::cerr << "Could not load custom certificates: " << ec.message() << '\n';
                 return;
             }
-            owner = std::make_shared<SessionOwnerSSL>(ctx, *sslContext);
+            owner = std::make_shared<SessionOwnerSSL>(ctx, *sslCtx);
         }
         else
         {
@@ -430,47 +430,47 @@ class Server
 {
 public:
     Server(WebSocketSessionFactoryFunc sessionFactory, tcp::endpoint endpoint, int numThreads, WebSocketServerSSLSettings* sslSettings)
-        : m_context(numThreads)
-        , m_acceptor(m_context, endpoint)
+        : m_ctx(numThreads)
+        , m_acceptor(m_ctx, endpoint)
         , m_sessionFactory(std::move(sessionFactory))
     {
         if (sslSettings)
         {
             m_sslSettings = *sslSettings;
 
-            m_sslContext.reset(new net::ssl::context(net::ssl::context::tlsv12));
-            m_sslContext->set_options(
+            m_sslCtx.reset(new net::ssl::context(net::ssl::context::tlsv12));
+            m_sslCtx->set_options(
                 net::ssl::context::default_workarounds |
                 net::ssl::context::no_sslv2 |
                 net::ssl::context::single_dh_use);
 
             if (m_sslSettings.certificate.empty())
-                m_sslContext->use_certificate_chain_file(m_sslSettings.certificateFile);
+                m_sslCtx->use_certificate_chain_file(m_sslSettings.certificateFile);
             else
-                m_sslContext->use_certificate_chain(net::buffer(m_sslSettings.certificate));
+                m_sslCtx->use_certificate_chain(net::buffer(m_sslSettings.certificate));
 
             if (m_sslSettings.privateKey.empty())
-                m_sslContext->use_private_key_file(m_sslSettings.privateKeyFile, net::ssl::context::file_format::pem);
+                m_sslCtx->use_private_key_file(m_sslSettings.privateKeyFile, net::ssl::context::file_format::pem);
             else
-                m_sslContext->use_private_key(net::buffer(m_sslSettings.privateKey), net::ssl::context::file_format::pem);
+                m_sslCtx->use_private_key(net::buffer(m_sslSettings.privateKey), net::ssl::context::file_format::pem);
 
             if (m_sslSettings.tmpDH.empty())
-                m_sslContext->use_tmp_dh_file(m_sslSettings.tmpDHFile);
+                m_sslCtx->use_tmp_dh_file(m_sslSettings.tmpDHFile);
             else
-                m_sslContext->use_tmp_dh(net::buffer(m_sslSettings.tmpDH));
+                m_sslCtx->use_tmp_dh(net::buffer(m_sslSettings.tmpDH));
         }
 
         doAccept();
         m_threads.reserve(size_t(numThreads));
         for (int i = 0; i < numThreads; ++i)
         {
-            m_threads.emplace_back([this]() { m_context.run(); });
+            m_threads.emplace_back([this]() { m_ctx.run(); });
         }
     }
 
     ~Server()
     {
-        m_context.stop();
+        m_ctx.stop();
         for (auto& thread : m_threads)
         {
             thread.join();
@@ -492,16 +492,16 @@ public:
 
         // init session and owner
         std::shared_ptr<SessionOwnerBase> owner;
-        if (m_sslContext)
+        if (m_sslCtx)
         {
-            owner = std::make_shared<SessionOwnerSSL>(std::move(socket), *m_sslContext);
+            owner = std::make_shared<SessionOwnerSSL>(std::move(socket), *m_sslCtx);
         }
         else
         {
             owner = std::make_shared<SessionOwnerWS>(std::move(socket));
         }
         auto session = m_sessionFactory();
-        session->m_ioStrandHolder = std::make_unique<StrandHolder>(m_context);
+        session->m_ioStrandHolder = std::make_unique<StrandHolder>(m_ctx);
         owner->setSession(std::move(session));
 
         // and initiate
@@ -511,8 +511,8 @@ public:
         doAccept();
     }
 
-    net::io_context m_context;
-    std::unique_ptr<net::ssl::context> m_sslContext;
+    net::io_context m_ctx;
+    std::unique_ptr<net::ssl::context> m_sslCtx;
 
     tcp::acceptor m_acceptor;
 
