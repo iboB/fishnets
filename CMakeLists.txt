@@ -63,5 +63,5 @@ if(FISHNETS_BUILD_TESTS)
 endif()
 
 if(FISHNETS_BUILD_EXAMPLES)
-    # add_subdirectory(example)
+    add_subdirectory(example)
 endif()

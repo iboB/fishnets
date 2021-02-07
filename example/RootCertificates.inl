@@ -1,13 +1,11 @@
 // copied from boost beast examples
-#include <boost/asio/ssl.hpp>
+#include <vector>
 #include <string>
 
 namespace
 {
 
-void LoadRootCertificates(boost::asio::ssl::context& ctx, boost::system::error_code& ec)
-{
-    std::string const cert =
+std::vector<std::string> rootCertificates = {
         /*  This is the DigiCert Global Root CA
             CN = DigiCert High Assurance EV Root CA
             OU = www.digicert.com
@@ -44,7 +42,7 @@ void LoadRootCertificates(boost::asio::ssl::context& ctx, boost::system::error_c
         "YSEY1QSteDwsOoBrp+uvFRTp2InBuThs4pFsiv9kuXclVzDAGySj4dzp30d8tbQk\n"
         "CAUw7C29C79Fv1C5qfPrmAESrciIxpg0X40KPMbp1ZWVbd4=\n"
         "-----END CERTIFICATE-----\n"
-
+    ,
         /*  This is the GeoTrust root certificate.
 
             CN = GeoTrust Global CA
@@ -75,10 +73,8 @@ void LoadRootCertificates(boost::asio::ssl::context& ctx, boost::system::error_c
         "fQyshjlPP9mYVxWOxqctUdQ8UnsUKKGEUcVrA08i1OAnVKlPFjKBvk+r7jpsTPcr\n"
         "9pWXTO9JrYMML7d+XRSZA1n3856OqZDX4403+9FnXCvfcLZLLKTBvwwFgEFGpzjK\n"
         "UEVbkhd5qstF6qWK\n"
-        "-----END CERTIFICATE-----\n";
-        ;
-
-    ctx.add_certificate_authority(boost::asio::buffer(cert.data(), cert.size()), ec);
-}
+        "-----END CERTIFICATE-----\n"
+    ,
+};
 
 }
