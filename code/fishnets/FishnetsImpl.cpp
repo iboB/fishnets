@@ -6,6 +6,7 @@
 // https://opensource.org/licenses/MIT
 //
 #include "WebSocketClient.hpp"
+#include "WebSocketClientSSLSettings.hpp"
 #include "WebSocketServer.hpp"
 #include "WebSocketServerSSLSettings.hpp"
 
@@ -17,8 +18,6 @@
 #include <boost/beast/websocket.hpp>
 #include <boost/beast/ssl.hpp>
 #include <boost/asio/io_context_strand.hpp>
-
-#include "LoadRootCertificates.inl"
 
 #include <iostream>
 #include <cassert>
@@ -371,7 +370,7 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 // client
 
-WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string& addr, uint16_t port, bool https)
+WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string& addr, uint16_t port, WebSocketClientSSLSettings* sslSettings)
 {
     net::io_context ctx(1);
     std::unique_ptr<net::ssl::context> sslContext;
@@ -390,14 +389,18 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
 
         // init session and owner
         std::shared_ptr<SessionOwnerBase> owner;
-        if (https)
+        if (sslSettings)
         {
             sslContext.reset(new net::ssl::context(net::ssl::context::tlsv12_client));
             boost::system::error_code ec;
-            LoadRootCertificates(*sslContext, ec);
+            for (auto& cert : sslSettings->customCertificates)
+            {
+                sslContext->add_certificate_authority(boost::asio::buffer(cert), ec);
+                if (ec) break;
+            }
             if (ec)
             {
-                std::cerr << "Could not load root certificates: " << ec.message() << '\n';
+                std::cerr << "Could not load custom certificates: " << ec.message() << '\n';
                 return;
             }
             owner = std::make_shared<SessionOwnerSSL>(ctx, *sslContext);

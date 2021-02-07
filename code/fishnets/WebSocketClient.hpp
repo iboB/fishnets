@@ -15,11 +15,16 @@
 
 namespace fishnets
 {
+struct WebSocketClientSSLSettings;
 
 class FISHNETS_API WebSocketClient
 {
 public:
-    WebSocketClient(WebSocketSessionPtr session, const std::string& addr, uint16_t port, bool https = false);
+    WebSocketClient(
+        WebSocketSessionPtr session,
+        const std::string& addr,
+        uint16_t port,
+        WebSocketClientSSLSettings* sslSettings = nullptr);
 };
 
 }
