@@ -58,8 +58,8 @@ endif()
 add_subdirectory(code/fishnets)
 
 if(FISHNETS_BUILD_TESTS)
-    # enable_testing()
-    # add_subdirectory(test)
+    enable_testing()
+    add_subdirectory(test)
 endif()
 
 if(FISHNETS_BUILD_EXAMPLES)
