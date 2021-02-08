@@ -8,7 +8,7 @@ CPMAddPackage(
 
 macro(fishnets_dual_test test)
     icm_add_doctest_lib_test(${test}-ws fishnets ${ARGN} TestNullSSLSettings.cpp)
-    # icm_add_doctest_lib_test(${test}-ssl fishnets ${ARGN} TestSSLSettings.cpp)
+    icm_add_doctest_lib_test(${test}-ssl fishnets ${ARGN} TestSSLSettings.cpp)
 endmacro()
 
 fishnets_dual_test(SimpleClientServer t-SimpleClientServer.cpp)
