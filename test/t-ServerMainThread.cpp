@@ -15,6 +15,8 @@
 #include <xec/ThreadExecution.hpp>
 #include <xec/TaskExecutor.hpp>
 
+#include <list>
+
 struct Packet
 {
     bool istext = false;
@@ -246,7 +248,7 @@ TEST_CASE("test")
 
 
     std::vector<std::thread> wsClientThreads;
-    for (int i = 0; i < NUM_SESSIONS; ++i)
+    for (int i = 0; i < int(NUM_SESSIONS); ++i)
     {
         wsClientThreads.emplace_back([i]() {
             fishnets::WebSocketClient client(

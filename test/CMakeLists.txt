@@ -9,7 +9,7 @@ CPMAddPackage(
 CPMAddPackage(
     NAME xec
     GITHUB_REPOSITORY iboB/xec
-    VERSION 1.1.0
+    VERSION 1.1.1
 )
 
 add_library(TestSSLSettings STATIC TestSSLSettings.cpp)

@@ -19,8 +19,13 @@
 #endif
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
-#include <boost/beast/ssl.hpp>
 #include <boost/asio/strand.hpp>
+
+#define FISHNETS_ENABLE_SSL 0
+
+#if FISHNETS_ENABLE_SSL
+#include <boost/beast/ssl.hpp>
+#endif
 
 #include <iostream>
 #include <cassert>
@@ -318,6 +323,8 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 // https session owner
 
+#if FISHNETS_ENABLE_SSL
+
 using WSSSL = beast::websocket::stream<net::ssl::stream<tcp::socket>>;
 class SessionOwnerSSL final : public SessionOwnerT<WSSSL>
 {
@@ -370,6 +377,8 @@ public:
     }
 };
 
+#endif
+
 } // anonymous namespace
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -378,7 +387,9 @@ public:
 WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string& addr, uint16_t port, WebSocketClientSSLSettings* sslSettings)
 {
     net::io_context ctx(1);
+#if FISHNETS_ENABLE_SSL
     std::unique_ptr<net::ssl::context> sslCtx;
+#endif
 
     {
         // tcp::resolver resolver{net::io_context::strand(ctx)};
@@ -397,6 +408,7 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
         std::shared_ptr<SessionOwnerBase> owner;
         if (sslSettings)
         {
+#if FISHNETS_ENABLE_SSL
             sslCtx.reset(new net::ssl::context(net::ssl::context::tlsv12_client));
             boost::system::error_code ec;
             for (auto& cert : sslSettings->customCertificates)
@@ -410,6 +422,9 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
                 return;
             }
             owner = std::make_shared<SessionOwnerSSL>(ctx, *sslCtx);
+#else
+            std::terminate();
+#endif
         }
         else
         {
@@ -442,6 +457,7 @@ public:
     {
         if (sslSettings)
         {
+#if FISHNETS_ENABLE_SSL
             m_sslSettings = *sslSettings;
 
             m_sslCtx.reset(new net::ssl::context(net::ssl::context::tlsv12));
@@ -464,6 +480,9 @@ public:
                 m_sslCtx->use_tmp_dh_file(m_sslSettings.tmpDHFile);
             else
                 m_sslCtx->use_tmp_dh(net::buffer(m_sslSettings.tmpDH));
+#else
+            std::terminate();
+#endif
         }
 
         doAccept();
@@ -485,7 +504,7 @@ public:
 
     void doAccept()
     {
-        m_acceptor.async_accept(beast::bind_front_handler(&Server::onAccept, this));
+        m_acceptor.async_accept(net::make_strand(m_ctx), beast::bind_front_handler(&Server::onAccept, this));
     }
 
     void onAccept(beast::error_code e, tcp::socket socket)
@@ -498,11 +517,14 @@ public:
 
         // init session and owner
         std::shared_ptr<SessionOwnerBase> owner;
+#if FISHNETS_ENABLE_SSL
         if (m_sslCtx)
         {
+
             owner = std::make_shared<SessionOwnerSSL>(std::move(socket), *m_sslCtx);
         }
         else
+#endif
         {
             owner = std::make_shared<SessionOwnerWS>(std::move(socket));
         }
@@ -518,7 +540,9 @@ public:
     }
 
     net::io_context m_ctx;
+#if FISHNETS_ENABLE_SSL
     std::unique_ptr<net::ssl::context> m_sslCtx;
+#endif
 
     tcp::acceptor m_acceptor;
 
@@ -539,4 +563,4 @@ WebSocketServer::WebSocketServer(WebSocketSessionFactoryFunc sessionFactory, uin
 
 WebSocketServer::~WebSocketServer() = default;
 
-} // namespace vws
+} // namespace fishnets

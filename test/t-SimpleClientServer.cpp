@@ -12,6 +12,8 @@
 #include <fishnets/WebSocketServer.hpp>
 #include <fishnets/WebSocketSession.hpp>
 
+#include <cstring>
+
 struct Packet
 {
     bool istext = false;
