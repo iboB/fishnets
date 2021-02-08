@@ -109,16 +109,16 @@ class TestServerSession final : public fishnets::WebSocketSession
     {
         REQUIRE(receivedIndex < packets.size());
         CHECK(packets[receivedIndex] == binary);
+        wsSend(itlib::make_memory_view(packets[receivedIndex].binary));
         ++receivedIndex;
-        wsSend(binary);
     }
 
     void wsReceivedText(std::string_view text) override
     {
         REQUIRE(receivedIndex < packets.size());
         CHECK(packets[receivedIndex] == text);
+        wsSend(packets[receivedIndex].text);
         ++receivedIndex;
-        wsSend(text);
     }
 
     void wsCompletedSend() override
