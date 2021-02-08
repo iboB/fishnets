@@ -13,6 +13,7 @@
 #include "WebSocketSession.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
+#define BOOST_ASIO_USE_TS_EXECUTOR_AS_DEFAULT 1
 
 #if defined(_MSC_VER)
 #   pragma warning (disable: 4100)
@@ -40,13 +41,13 @@ using tcp = net::ip::tcp;
 namespace fishnets
 {
 
-class StrandHolder
+class ExecutorHolder
 {
 public:
-    StrandHolder(net::io_context& ctx)
-        : strand(ctx)
+    ExecutorHolder(net::executor&& ex)
+        : executor(std::move(ex))
     {}
-    net::io_context::strand strand;
+    net::executor executor;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -59,6 +60,8 @@ public:
     {
         m_session->closed();
     }
+
+    virtual net::executor executor() = 0;
 
     // accept flow
 
@@ -174,7 +177,7 @@ void WebSocketSession::closed()
 
 void WebSocketSession::postWSIOTask(std::function<void()> task)
 {
-    m_ioStrandHolder->strand.post(std::move(task));
+    net::dispatch(m_ioExecutorHolder->executor, std::move(task));
 }
 
 void WebSocketSession::wsClose()
@@ -229,6 +232,11 @@ public:
     {}
 
     WS m_ws;
+
+    net::executor executor() override final
+    {
+        return m_ws.get_executor();
+    }
 
     std::shared_ptr<SessionOwnerT> shared_from_base()
     {
@@ -431,7 +439,7 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
             owner = std::make_shared<SessionOwnerWS>(ctx);
         }
 
-        session->m_ioStrandHolder = std::make_unique<StrandHolder>(ctx);
+        session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(ctx.get_executor());
         owner->setSession(std::move(session));
 
         // and initiate
@@ -529,7 +537,7 @@ public:
             owner = std::make_shared<SessionOwnerWS>(std::move(socket));
         }
         auto session = m_sessionFactory();
-        session->m_ioStrandHolder = std::make_unique<StrandHolder>(m_ctx);
+        session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(owner->executor());
         owner->setSession(std::move(session));
 
         // and initiate

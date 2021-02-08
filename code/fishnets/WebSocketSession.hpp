@@ -17,7 +17,7 @@ namespace fishnets
 {
 class Server;
 class SessionOwnerBase;
-class StrandHolder;
+class ExecutorHolder;
 class WebSocketClient;
 
 // the lifetime of a session is managed via a shared pointer to this
@@ -68,7 +68,7 @@ private:
     SessionOwnerBase* m_owner = nullptr;
 
     // used for posting IO tasks
-    std::unique_ptr<StrandHolder> m_ioStrandHolder;
+    std::unique_ptr<ExecutorHolder> m_ioExecutorHolder;
 
     void opened(SessionOwnerBase& session);
     void closed();
