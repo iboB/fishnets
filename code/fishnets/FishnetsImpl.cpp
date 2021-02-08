@@ -14,6 +14,9 @@
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
 
+#if defined(_MSC_VER)
+#   pragma warning (disable: 4100)
+#endif
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/beast/ssl.hpp>
@@ -295,7 +298,8 @@ public:
     }
 
     SessionOwnerWS(net::io_context& ctx)
-        : Super(WSWS(net::io_context::strand(ctx)))
+        //: Super(WSWS(net::io_context::strand(ctx)))
+        : Super(WSWS(ctx))
     {}
 
     // accept flow
@@ -327,7 +331,8 @@ public:
     }
 
     SessionOwnerSSL(net::io_context& ctx, net::ssl::context& sslCtx)
-        : Super(WSSSL(net::io_context::strand(ctx), sslCtx))
+        //: Super(WSSSL(net::io_context::strand(ctx), sslCtx))
+        : Super(WSSSL(ctx, sslCtx))
     {}
 
     std::shared_ptr<SessionOwnerSSL> shared_from_base()
@@ -376,7 +381,8 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
     std::unique_ptr<net::ssl::context> sslCtx;
 
     {
-        tcp::resolver resolver{net::io_context::strand(ctx)};
+        // tcp::resolver resolver{net::io_context::strand(ctx)};
+        tcp::resolver resolver{ctx};
 
         char portstr[6] = {};
         std::to_chars(portstr, portstr+6, port);

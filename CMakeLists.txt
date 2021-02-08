@@ -49,7 +49,15 @@ find_package(Threads REQUIRED)
 find_package(OpenSSL REQUIRED)
 
 if(ICM_DEV_MODE)
-    add_subdirectory(boost)
+    # only add boost in dev mode
+    # otherwise rely on the external project providing it
+    CPMAddPackage(
+          NAME boost-cmake
+          GITHUB_REPOSITORY iboB/boost-cmake
+          GIT_TAG ba9ed0b991a001ed49d0ae7b8796890dae75198a
+    )
+    add_library(boost-beast INTERFACE)
+    target_link_libraries(boost-beast INTERFACE Boost::boost)
 endif()
 
 #######################################
