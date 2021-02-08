@@ -20,7 +20,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/beast/ssl.hpp>
-#include <boost/asio/io_context_strand.hpp>
+#include <boost/asio/strand.hpp>
 
 #include <iostream>
 #include <cassert>
