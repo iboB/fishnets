@@ -49,6 +49,7 @@ int main()
     // fishnets::WebSocketClientSSLSettings sslSettings;
     // sslSettings.customCertificates = rootCertificates;
     // fishnets::WebSocketClient client(std::make_shared<OneshotSession>(), "echo.websocket.org", 443, &sslSettings);
+    // fishnets::WebSocketClient client(std::make_shared<OneshotSession>(), "echo.websocket.org", 80);
     fishnets::WebSocketClient client(std::make_shared<OneshotSession>(), "localhost", 7654);
 
     return 0;

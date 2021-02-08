@@ -22,7 +22,7 @@
 #include <boost/beast/websocket.hpp>
 #include <boost/asio/strand.hpp>
 
-#define FISHNETS_ENABLE_SSL 0
+#define FISHNETS_ENABLE_SSL 1
 
 #if FISHNETS_ENABLE_SSL
 #include <boost/beast/ssl.hpp>

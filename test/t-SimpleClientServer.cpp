@@ -13,6 +13,7 @@
 #include <fishnets/WebSocketSession.hpp>
 
 #include <cstring>
+#include <deque>
 
 struct Packet
 {
@@ -111,22 +112,39 @@ class TestServerSession final : public fishnets::WebSocketSession
     {
         REQUIRE(receivedIndex < packets.size());
         CHECK(packets[receivedIndex] == binary);
-        wsSend(itlib::make_memory_view(packets[receivedIndex].binary));
+        sendQueue.push_back(receivedIndex);
         ++receivedIndex;
+        send();
     }
 
     void wsReceivedText(std::string_view text) override
     {
         REQUIRE(receivedIndex < packets.size());
         CHECK(packets[receivedIndex] == text);
-        wsSend(packets[receivedIndex].text);
+        sendQueue.push_back(receivedIndex);
         ++receivedIndex;
+        send();
+    }
+
+    void send()
+    {
+        if (curSend) return;
+        if (sendQueue.empty()) return;
+        curSend.emplace(sendQueue.front());
+        sendQueue.pop_front();
+        auto& packet = packets[*curSend];
+        if (packet.istext) wsSend(packet.text);
+        else wsSend(itlib::make_memory_view(packet.binary));
     }
 
     void wsCompletedSend() override
     {
+        curSend.reset();
+        send();
     }
 
+    std::deque<size_t> sendQueue;
+    std::optional<size_t> curSend;
     size_t receivedIndex = 0;
 };
 

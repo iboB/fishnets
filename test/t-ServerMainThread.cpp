@@ -24,7 +24,7 @@ struct Packet
     std::vector<uint8_t> binary;
 };
 
-static constexpr size_t NUM_SESSIONS = 1;
+static constexpr size_t NUM_SESSIONS = 2;
 
 class Object
 {
@@ -66,7 +66,6 @@ public:
 
     void wsOpened() override
     {
-        m_ioThreadId = std::this_thread::get_id();
         m_server.pushTask([self = shared_from_this()]() {
             self->m_server.subs.emplace_back(self);
         });
@@ -74,7 +73,6 @@ public:
 
     void wsClosed() override
     {
-        CHECK(std::this_thread::get_id() == m_ioThreadId);
         m_server.pushTask([self = shared_from_this()]() {
             auto& subs = self->m_server.subs;
             auto f = std::find(subs.begin(), subs.end(), self);
@@ -90,7 +88,6 @@ public:
 
     void wsReceivedBinary(itlib::const_memory_view<uint8_t> binary) override
     {
-        CHECK(std::this_thread::get_id() == m_ioThreadId);
         m_server.pushTask([obj = Object(binary), self = shared_from_this()]() {
             auto& server = self->m_server;
             server.objects.emplace_back(std::move(obj));
@@ -125,7 +122,6 @@ public:
 
     void wsCompletedSend() override
     {
-        CHECK(std::this_thread::get_id() == m_ioThreadId);
         m_curPacket.reset();
         if (m_sendQueue.empty()) return;
 
@@ -144,7 +140,6 @@ public:
 
     void sendPacketIOThread(Packet&& packet)
     {
-        CHECK(std::this_thread::get_id() == m_ioThreadId);
         m_sendQueue.emplace_back(std::move(packet));
 
         if (!m_curPacket)
@@ -172,7 +167,6 @@ public:
         });
     }
 
-    std::thread::id m_ioThreadId = {};
     std::list<Packet> m_sendQueue;
     std::optional<Packet> m_curPacket;
     Server& m_server;
