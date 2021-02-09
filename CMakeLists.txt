@@ -10,7 +10,7 @@ include(./get_cpm.cmake)
 CPMAddPackage(
     NAME icm
     GITHUB_REPOSITORY iboB/icm
-    VERSION 1.3.0
+    VERSION 1.3.1
 )
 set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
