@@ -24,7 +24,7 @@ struct Packet
     std::vector<uint8_t> binary;
 };
 
-static constexpr size_t NUM_SESSIONS = 2;
+static constexpr size_t NUM_SESSIONS = 6;
 
 class Object
 {
@@ -56,23 +56,80 @@ public:
     bool byesSent = false;
 };
 
+// ordering checks
+// checks that io calls are strictly ordered
+// it's an interface so as to have a noop implementation
+// thus not all sessions will have ordering checks in case these ordering checks imrove the actual ordering
+struct OrderingCheckBase
+{
+    virtual ~OrderingCheckBase() = default;
+    virtual void lock() = 0;
+    virtual void unlock() = 0;
+};
+
+struct NoopOrderingCheck final : OrderingCheckBase
+{
+    virtual void lock() override {}
+    virtual void unlock() override {}
+};
+
+struct StrictOrderingCheck final : OrderingCheckBase
+{
+    std::mutex mut;
+
+    virtual void lock() override
+    {
+        REQUIRE(mut.try_lock());
+    }
+
+    virtual void unlock() override
+    {
+        mut.unlock();
+    }
+};
+
+std::atomic_int32_t destroyedServerSessions = {};
+
 class TestServerSession final : public fishnets::WebSocketSession, public Subscriber, public std::enable_shared_from_this<TestServerSession>
 {
 public:
-    TestServerSession(Server& server)
+    TestServerSession(Server& server, int32_t id)
         : m_server(server)
     {
+        if (id % 2)
+        {
+            m_orderingCheck.reset(new NoopOrderingCheck);
+        }
+        else
+        {
+            m_orderingCheck.reset(new StrictOrderingCheck);
+        }
+    }
+
+    ~TestServerSession()
+    {
+        ++destroyedServerSessions;
     }
 
     void wsOpened() override
     {
+        std::lock_guard l(*m_orderingCheck);
+
         m_server.pushTask([self = shared_from_this()]() {
-            self->m_server.subs.emplace_back(self);
+            auto& server = self->m_server;
+            server.subs.emplace_back(self);
+            // send existing objects
+            for (auto& obj : server.objects)
+            {
+                self->sendObj(obj);
+            }
         });
     }
 
     void wsClosed() override
     {
+        std::lock_guard l(*m_orderingCheck);
+        CHECK(m_totalSends == (NUM_SESSIONS - 1) * 5 /*obj*/ + 5 /*ack*/ + 1 /*bye*/);
         m_server.pushTask([self = shared_from_this()]() {
             auto& subs = self->m_server.subs;
             auto f = std::find(subs.begin(), subs.end(), self);
@@ -88,6 +145,7 @@ public:
 
     void wsReceivedBinary(itlib::const_memory_view<uint8_t> binary) override
     {
+        std::lock_guard l(*m_orderingCheck);
         m_server.pushTask([obj = Object(binary), self = shared_from_this()]() {
             auto& server = self->m_server;
             server.objects.emplace_back(std::move(obj));
@@ -122,6 +180,12 @@ public:
 
     void wsCompletedSend() override
     {
+        std::lock_guard l(*m_orderingCheck);
+        doSend();
+    }
+
+    void doSend()
+    {
         m_curPacket.reset();
         if (m_sendQueue.empty()) return;
 
@@ -136,15 +200,17 @@ public:
         {
             wsSend(itlib::make_memory_view(m_curPacket->binary));
         }
+        ++m_totalSends;
     }
 
     void sendPacketIOThread(Packet&& packet)
     {
+        std::lock_guard l(*m_orderingCheck);
         m_sendQueue.emplace_back(std::move(packet));
 
         if (!m_curPacket)
         {
-            wsCompletedSend();
+            doSend();
         }
     }
 
@@ -169,8 +235,12 @@ public:
 
     std::list<Packet> m_sendQueue;
     std::optional<Packet> m_curPacket;
+    size_t m_totalSends = 0;
     Server& m_server;
+    std::unique_ptr<OrderingCheckBase> m_orderingCheck;
 };
+
+std::atomic_int32_t destroyedClientSessions = {};
 
 class TestClientSession final : public fishnets::WebSocketSession
 {
@@ -186,6 +256,11 @@ public:
             }
             m_objects.emplace_back(itlib::make_memory_view(buf));
         }
+    }
+
+    ~TestClientSession()
+    {
+        ++destroyedClientSessions;
     }
 
     void wsOpened() override
@@ -236,9 +311,10 @@ TEST_CASE("test")
     server.setExecutionContext(executionContext);
 
     static constexpr uint16_t port = 7654;
-    fishnets::WebSocketServer wsServer([&server]() -> fishnets::WebSocketSessionPtr {
-        return std::make_shared<TestServerSession>(server);
-    }, port, 4, testServerSSLSettings.get());
+    std::atomic_int32_t freeServerSessionId = {};
+    fishnets::WebSocketServer wsServer([&server, &freeServerSessionId]() -> fishnets::WebSocketSessionPtr {
+        return std::make_shared<TestServerSession>(server, int32_t(freeServerSessionId++));
+    }, port, 3, testServerSSLSettings.get());
 
 
     std::vector<std::thread> wsClientThreads;
@@ -267,4 +343,6 @@ TEST_CASE("test")
     }
 
     CHECK(server.subs.empty());
+    CHECK(destroyedServerSessions == NUM_SESSIONS);
+    CHECK(destroyedClientSessions == NUM_SESSIONS);
 }

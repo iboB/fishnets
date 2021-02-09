@@ -14,6 +14,7 @@
 
 #include <cstring>
 #include <deque>
+#include <optional>
 
 struct Packet
 {
