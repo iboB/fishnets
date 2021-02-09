@@ -41,7 +41,7 @@ public:
     virtual void wsClosed() = 0;
 
     // call to initiate the close of the session
-    virtual void wsClose();
+    void wsClose();
 
     // called when data is received
     virtual void wsReceivedBinary(itlib::const_memory_view<uint8_t> binary) = 0;
