@@ -56,24 +56,24 @@ public:
     bool byesSent = false;
 };
 
-// ordering checks
-// checks that io calls are strictly ordered
+// sequencing checks
+// checks that io calls are strictly sequenced
 // it's an interface so as to have a noop implementation
-// thus not all sessions will have ordering checks in case these ordering checks imrove the actual ordering
-struct OrderingCheckBase
+// thus not all sessions will have sequencing checks in case these sequencing checks imrove the actual sequencing
+struct SeqCheckBase
 {
-    virtual ~OrderingCheckBase() = default;
+    virtual ~SeqCheckBase() = default;
     virtual void lock() = 0;
     virtual void unlock() = 0;
 };
 
-struct NoopOrderingCheck final : OrderingCheckBase
+struct NoopSeqCheck final : SeqCheckBase
 {
     virtual void lock() override {}
     virtual void unlock() override {}
 };
 
-struct StrictOrderingCheck final : OrderingCheckBase
+struct StrictSeqCheck final : SeqCheckBase
 {
     std::mutex mut;
 
@@ -98,11 +98,11 @@ public:
     {
         if (id % 2)
         {
-            m_orderingCheck.reset(new NoopOrderingCheck);
+            m_seqCheck.reset(new NoopSeqCheck);
         }
         else
         {
-            m_orderingCheck.reset(new StrictOrderingCheck);
+            m_seqCheck.reset(new StrictSeqCheck);
         }
     }
 
@@ -113,7 +113,7 @@ public:
 
     void wsOpened() override
     {
-        std::lock_guard l(*m_orderingCheck);
+        std::lock_guard l(*m_seqCheck);
 
         m_server.pushTask([self = shared_from_this()]() {
             auto& server = self->m_server;
@@ -128,7 +128,7 @@ public:
 
     void wsClosed() override
     {
-        std::lock_guard l(*m_orderingCheck);
+        std::lock_guard l(*m_seqCheck);
         CHECK(m_totalSends == (NUM_SESSIONS - 1) * 5 /*obj*/ + 5 /*ack*/ + 1 /*bye*/);
         m_server.pushTask([self = shared_from_this()]() {
             auto& subs = self->m_server.subs;
@@ -145,7 +145,7 @@ public:
 
     void wsReceivedBinary(itlib::const_memory_view<uint8_t> binary) override
     {
-        std::lock_guard l(*m_orderingCheck);
+        std::lock_guard l(*m_seqCheck);
         m_server.pushTask([obj = Object(binary), self = shared_from_this()]() {
             auto& server = self->m_server;
             server.objects.emplace_back(std::move(obj));
@@ -180,7 +180,7 @@ public:
 
     void wsCompletedSend() override
     {
-        std::lock_guard l(*m_orderingCheck);
+        std::lock_guard l(*m_seqCheck);
         doSend();
     }
 
@@ -205,7 +205,7 @@ public:
 
     void sendPacketIOThread(Packet&& packet)
     {
-        std::lock_guard l(*m_orderingCheck);
+        std::lock_guard l(*m_seqCheck);
         m_sendQueue.emplace_back(std::move(packet));
 
         if (!m_curPacket)
@@ -237,7 +237,7 @@ public:
     std::optional<Packet> m_curPacket;
     size_t m_totalSends = 0;
     Server& m_server;
-    std::unique_ptr<OrderingCheckBase> m_orderingCheck;
+    std::unique_ptr<SeqCheckBase> m_seqCheck;
 };
 
 std::atomic_int32_t destroyedClientSessions = {};
