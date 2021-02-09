@@ -97,14 +97,14 @@ public:
         if (e == beast::websocket::error::closed) return closed();
         if (e) return failed(e, "read");
 
-        auto bufData = m_readBuf.cdata().data();
+        auto bufData = m_readBuf.data().data();
         if (text)
         {
-            m_session->wsReceivedText(std::string_view(static_cast<const char*>(bufData), m_readBuf.size()));
+            m_session->wsReceivedText(itlib::make_memory_view(static_cast<char*>(bufData), m_readBuf.size()));
         }
         else
         {
-            m_session->wsReceivedBinary(itlib::make_memory_view(static_cast<const uint8_t*>(bufData), m_readBuf.size()));
+            m_session->wsReceivedBinary(itlib::make_memory_view(static_cast<uint8_t*>(bufData), m_readBuf.size()));
         }
 
         m_readBuf.clear();

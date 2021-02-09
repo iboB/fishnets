@@ -25,15 +25,16 @@ class OneshotSession final : public fishnets::WebSocketSession
         std::cout << "Disconnected\n";
     }
 
-    void wsReceivedBinary(itlib::const_memory_view<uint8_t> binary) override
+    void wsReceivedBinary(itlib::memory_view<uint8_t> binary) override
     {
         std::cout << "Received binary with size " << binary.size() << '\n';
         wsClose();
     }
 
-    void wsReceivedText(std::string_view text) override
+    void wsReceivedText(itlib::memory_view<char> text) override
     {
-        std::cout << "Received text " << text << '\n';
+        std::string_view str(text.data(), text.size());
+        std::cout << "Received text " << str << '\n';
         wsClose();
     }
 

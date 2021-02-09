@@ -69,7 +69,7 @@ class TestClientSession final : public fishnets::WebSocketSession
     {
     }
 
-    void wsReceivedBinary(itlib::const_memory_view<uint8_t> binary) override
+    void wsReceivedBinary(itlib::memory_view<uint8_t> binary) override
     {
         REQUIRE(receivedIndex < packets.size());
         CHECK(packets[receivedIndex] == binary);
@@ -77,10 +77,11 @@ class TestClientSession final : public fishnets::WebSocketSession
         closeIfDone();
     }
 
-    void wsReceivedText(std::string_view text) override
+    void wsReceivedText(itlib::memory_view<char> text) override
     {
         REQUIRE(receivedIndex < packets.size());
-        CHECK(packets[receivedIndex] == text);
+        std::string_view str(text.data(), text.size());
+        CHECK(packets[receivedIndex] == str);
         ++receivedIndex;
         closeIfDone();
     }
@@ -109,7 +110,7 @@ class TestServerSession final : public fishnets::WebSocketSession
     {
     }
 
-    void wsReceivedBinary(itlib::const_memory_view<uint8_t> binary) override
+    void wsReceivedBinary(itlib::memory_view<uint8_t> binary) override
     {
         REQUIRE(receivedIndex < packets.size());
         CHECK(packets[receivedIndex] == binary);
@@ -118,10 +119,11 @@ class TestServerSession final : public fishnets::WebSocketSession
         send();
     }
 
-    void wsReceivedText(std::string_view text) override
+    void wsReceivedText(itlib::memory_view<char> text) override
     {
         REQUIRE(receivedIndex < packets.size());
-        CHECK(packets[receivedIndex] == text);
+        std::string_view str(text.data(), text.size());
+        CHECK(packets[receivedIndex] == str);
         sendQueue.push_back(receivedIndex);
         ++receivedIndex;
         send();

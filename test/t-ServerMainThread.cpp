@@ -143,7 +143,7 @@ public:
         });
     }
 
-    void wsReceivedBinary(itlib::const_memory_view<uint8_t> binary) override
+    void wsReceivedBinary(itlib::memory_view<uint8_t> binary) override
     {
         std::lock_guard l(*m_seqCheck);
         m_server.pushTask([obj = Object(binary), self = shared_from_this()]() {
@@ -173,7 +173,7 @@ public:
         });
     }
 
-    void wsReceivedText(std::string_view) override
+    void wsReceivedText(itlib::memory_view<char>) override
     {
         DOCTEST_FAIL("no text!");
     }
@@ -273,16 +273,17 @@ public:
         CHECK(m_newObjects.size() == (NUM_SESSIONS - 1) * 5);
     }
 
-    void wsReceivedBinary(itlib::const_memory_view<uint8_t> binary) override
+    void wsReceivedBinary(itlib::memory_view<uint8_t> binary) override
     {
         m_newObjects.emplace_back(binary);
     }
 
-    void wsReceivedText(std::string_view text) override
+    void wsReceivedText(itlib::memory_view<char> text) override
     {
-        if (text == "ack")
+        std::string_view str(text.data(), text.size());
+        if (str == "ack")
             ++acks;
-        else if (text == "done")
+        else if (str == "done")
             wsClose();
     }
 

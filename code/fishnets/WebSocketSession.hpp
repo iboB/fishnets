@@ -44,8 +44,8 @@ public:
     void wsClose();
 
     // called when data is received
-    virtual void wsReceivedBinary(itlib::const_memory_view<uint8_t> binary) = 0;
-    virtual void wsReceivedText(std::string_view text) = 0;
+    virtual void wsReceivedBinary(itlib::memory_view<uint8_t> binary) = 0;
+    virtual void wsReceivedText(itlib::memory_view<char> text) = 0;
 
     // call to initiate a send
     // only a single write is supported at a time
