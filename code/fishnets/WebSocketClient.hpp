@@ -20,6 +20,7 @@ struct WebSocketClientSSLSettings;
 class FISHNETS_API WebSocketClient
 {
 public:
+    // constructing a client will block the current thread until the client session is closed
     WebSocketClient(
         WebSocketSessionPtr session,
         const std::string& addr,

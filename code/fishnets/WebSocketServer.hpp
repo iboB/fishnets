@@ -20,6 +20,10 @@ class Server;
 class FISHNETS_API WebSocketServer
 {
 public:
+    // constructing a server will immediately complete
+    // it will launch a number of io threads
+    // destroying the server will stop the network io
+    // the user must keep it alive for as long as needed
     WebSocketServer(
         WebSocketSessionFactoryFunc sessionFactory,
         uint16_t port,
