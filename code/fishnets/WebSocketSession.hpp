@@ -12,6 +12,7 @@
 #include <memory>
 #include <string_view>
 #include <functional>
+#include <string>
 
 namespace fishnets
 {
@@ -54,6 +55,14 @@ public:
     void wsSend(itlib::const_memory_view<uint8_t> binary);
     void wsSend(std::string_view text);
     virtual void wsCompletedSend() = 0;
+
+    struct EndpointInfo
+    {
+        std::string address;
+        uint16_t port;
+    };
+
+    EndpointInfo wsGetEndpointInfo() const;
 
 protected:
     WebSocketSession();

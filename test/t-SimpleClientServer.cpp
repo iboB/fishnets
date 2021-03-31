@@ -62,6 +62,10 @@ class TestClientSession final : public fishnets::WebSocketSession
 
     void wsOpened() override
     {
+        auto ep = wsGetEndpointInfo();
+        CHECK(ep.address == "127.0.0.1");
+        CHECK(ep.port == 7654);
+
         sendNext();
     }
 
@@ -104,6 +108,8 @@ class TestServerSession final : public fishnets::WebSocketSession
 {
     void wsOpened() override
     {
+        auto ep = wsGetEndpointInfo();
+        CHECK(ep.address == "127.0.0.1");
     }
 
     void wsClosed() override

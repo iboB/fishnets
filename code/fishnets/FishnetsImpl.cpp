@@ -129,6 +129,8 @@ public:
 
     // util
 
+    virtual WebSocketSession::EndpointInfo getEndpointInfo() = 0;
+
     void failed(beast::error_code e, const char* source)
     {
         std::cerr << source << " error: " << e.message() << '\n';
@@ -206,6 +208,12 @@ void WebSocketSession::wsSend(std::string_view text)
     }
 
     m_owner->write(true, net::buffer(text));
+}
+
+WebSocketSession::EndpointInfo WebSocketSession::wsGetEndpointInfo() const
+{
+    if (!m_owner) return {};
+    return m_owner->getEndpointInfo();
 }
 
 namespace
@@ -289,6 +297,18 @@ public:
 
         m_ws.async_handshake(m_host, "/",
             beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
+    }
+
+    // util
+    WebSocketSession::EndpointInfo getEndpointInfo() override final
+    {
+        auto ep = beast::get_lowest_layer(m_ws).remote_endpoint();
+
+        WebSocketSession::EndpointInfo ret;
+        ret.address = ep.address().to_string();
+        ret.port = ep.port();
+
+        return ret;
     }
 };
 

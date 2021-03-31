@@ -17,6 +17,8 @@ class EchoServerSession final : public fishnets::WebSocketSession
     void wsOpened() override
     {
         std::cout << "New session " << this << '\n';
+        auto endpoint = wsGetEndpointInfo();
+        std::cout << endpoint.address << " : " << endpoint.port << '\n';
     }
 
     void wsClosed() override
