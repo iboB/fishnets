@@ -54,7 +54,7 @@ if(ICM_DEV_MODE)
     CPMAddPackage(
           NAME boost-cmake
           GITHUB_REPOSITORY iboB/boost-cmake
-          GIT_TAG ba9ed0b991a001ed49d0ae7b8796890dae75198a
+          GIT_TAG 020d3769fff0eecc5ba3220ecfa85d7ef1b1f136
     )
     add_library(boost-beast INTERFACE)
     target_link_libraries(boost-beast INTERFACE Boost::boost)
