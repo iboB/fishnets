@@ -133,6 +133,9 @@ public:
 
     virtual WebSocketSession::EndpointInfo getEndpointInfo() = 0;
 
+    virtual void setCommonServerOptions() = 0;
+    virtual void setCommonClientOptions() = 0;
+
     void failed(beast::error_code e, const char* source)
     {
         std::cerr << source << " error: " << e.message() << '\n';
@@ -222,18 +225,6 @@ namespace
 {
 
 template <typename WS>
-void setCommonServerOptions(WS& ws)
-{
-    ws.read_message_max(32 * 1024 * 1024);
-
-    ws.set_option(beast::websocket::stream_base::decorator([](beast::websocket::response_type& res) {
-        res.set(beast::http::field::server, std::string(BOOST_BEAST_VERSION_STRING) + " ws-server");
-    }));
-
-    ws.set_option(beast::websocket::stream_base::timeout::suggested(beast::role_type::server));
-}
-
-template <typename WS>
 class SessionOwnerT : public SessionOwnerBase
 {
 public:
@@ -312,6 +303,28 @@ public:
 
         return ret;
     }
+
+    void setCommonServerOptions() override final
+    {
+        m_ws.read_message_max(32 * 1024 * 1024);
+
+        m_ws.set_option(beast::websocket::stream_base::decorator([](beast::websocket::response_type& res) {
+            res.set(beast::http::field::server, std::string(BOOST_BEAST_VERSION_STRING) + " fishnets-ws-server");
+        }));
+
+        m_ws.set_option(beast::websocket::stream_base::timeout::suggested(beast::role_type::server));
+    }
+
+    void setCommonClientOptions() override final
+    {
+        m_ws.read_message_max(2 * 1024 * 1024);
+
+        m_ws.set_option(beast::websocket::stream_base::decorator([](beast::websocket::response_type& res) {
+            res.set(beast::http::field::user_agent, std::string(BOOST_BEAST_VERSION_STRING) + " fishnets-ws-client");
+        }));
+
+        m_ws.set_option(beast::websocket::stream_base::timeout::suggested(beast::role_type::client));
+    }
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -328,9 +341,7 @@ public:
 
     SessionOwnerWS(tcp::socket&& socket)
         : Super(WSWS(std::move(socket)))
-    {
-        setCommonServerOptions(m_ws);
-    }
+    {}
 
     SessionOwnerWS(net::io_context& ctx)
         //: Super(WSWS(net::io_context::strand(ctx)))
@@ -363,9 +374,7 @@ public:
 
     SessionOwnerSSL(tcp::socket&& socket, net::ssl::context& sslCtx)
         : Super(WSSSL(std::move(socket), sslCtx))
-    {
-        setCommonServerOptions(m_ws);
-    }
+    {}
 
     SessionOwnerSSL(net::io_context& ctx, net::ssl::context& sslCtx)
         //: Super(WSSSL(net::io_context::strand(ctx), sslCtx))
@@ -460,6 +469,7 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
         {
             owner = std::make_shared<SessionOwnerWS>(ctx);
         }
+        owner->setCommonClientOptions();
 
         session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(ctx.get_executor());
         owner->setSession(std::move(session));
@@ -558,6 +568,7 @@ public:
         {
             owner = std::make_shared<SessionOwnerWS>(std::move(socket));
         }
+        owner->setCommonServerOptions();
         auto session = m_sessionFactory();
         session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(owner->executor());
         owner->setSession(std::move(session));
