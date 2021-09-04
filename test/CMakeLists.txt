@@ -19,7 +19,9 @@ target_link_libraries(TestNullSSLSettings PUBLIC fishnets)
 
 macro(fishnets_dual_test test)
     icm_add_doctest_lib_test(${test}-ws fishnets ${ARGN} LIBRARIES xec TestNullSSLSettings)
-    icm_add_doctest_lib_test(${test}-ssl fishnets ${ARGN} LIBRARIES xec TestSSLSettings)
+    if(FISHNETS_SSL)
+        icm_add_doctest_lib_test(${test}-ssl fishnets ${ARGN} LIBRARIES xec TestSSLSettings)
+    endif()
 endmacro()
 
 fishnets_dual_test(SimpleClientServer t-SimpleClientServer.cpp)

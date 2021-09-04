@@ -27,6 +27,7 @@ include(icm_bigobj)
 option(FISHNETS_STATIC "fishnets: build as static lib" OFF)
 option(FISHNETS_BUILD_TESTS "fishnets: build tests" ${ICM_DEV_MODE})
 option(FISHNETS_BUILD_EXAMPLES "fishnets: build examples" ${ICM_DEV_MODE})
+option(FISHNETS_SSL "fisnets: add ssl and secure websocket support" ON)
 
 if(ICM_DEV_MODE)
     mark_as_advanced(FISHNETS_BUILD_TESTS FISHNETS_BUILD_EXAMPLES)
@@ -46,7 +47,9 @@ CPMAddPackage(
 )
 
 find_package(Threads REQUIRED)
-find_package(OpenSSL REQUIRED)
+if(FISHNETS_SSL)
+    find_package(OpenSSL REQUIRED)
+endif()
 
 if(ICM_DEV_MODE)
     # only add boost in dev mode
