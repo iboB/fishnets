@@ -307,7 +307,7 @@ public:
 
 TEST_CASE("test")
 {
-    xec::internal::ThreadExecutionContext executionContext;
+    xec::ThreadExecutionContext executionContext;
     Server server;
     server.setExecutionContext(executionContext);
 
