@@ -13,5 +13,6 @@
 
 namespace fishnets
 {
-using WebSocketSessionFactoryFunc = std::function<WebSocketSessionPtr()>;
+struct WebSocketEndpointInfo;
+using WebSocketSessionFactoryFunc = std::function<WebSocketSessionPtr(const WebSocketEndpointInfo&)>;
 }

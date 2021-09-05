@@ -313,7 +313,7 @@ TEST_CASE("test")
 
     static constexpr uint16_t port = 7654;
     std::atomic_int32_t freeServerSessionId = {};
-    fishnets::WebSocketServer wsServer([&server, &freeServerSessionId]() -> fishnets::WebSocketSessionPtr {
+    fishnets::WebSocketServer wsServer([&server, &freeServerSessionId](const fishnets::WebSocketEndpointInfo&) -> fishnets::WebSocketSessionPtr {
         return std::make_shared<TestServerSession>(server, int32_t(freeServerSessionId++));
     }, port, 3, testServerSSLSettings.get());
 

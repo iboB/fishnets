@@ -225,6 +225,17 @@ WebSocketEndpointInfo WebSocketSession::wsGetEndpointInfo() const
 namespace
 {
 
+template <typename Socket>
+WebSocketEndpointInfo getEndpointInfoOf(const Socket& s)
+{
+    auto ep = beast::get_lowest_layer(s).remote_endpoint();
+
+    WebSocketEndpointInfo ret;
+    ret.address = ep.address().to_string();
+    ret.port = ep.port();
+    return ret;
+}
+
 template <typename WS>
 class SessionOwnerT : public SessionOwnerBase
 {
@@ -296,13 +307,7 @@ public:
     // util
     WebSocketEndpointInfo getEndpointInfo() override final
     {
-        auto ep = beast::get_lowest_layer(m_ws).remote_endpoint();
-
-        WebSocketEndpointInfo ret;
-        ret.address = ep.address().to_string();
-        ret.port = ep.port();
-
-        return ret;
+        return getEndpointInfoOf(m_ws);
     }
 
     void setCommonServerOptions() override final
@@ -557,6 +562,14 @@ public:
         }
 
         // init session and owner
+        auto session = m_sessionFactory(getEndpointInfoOf(socket));
+        if (!session)
+        {
+            std::cout << "session declined\n";
+            doAccept();
+            return;
+        }
+
         std::shared_ptr<SessionOwnerBase> owner;
 #if FISHNETS_ENABLE_SSL
         if (m_sslCtx)
@@ -570,7 +583,6 @@ public:
             owner = std::make_shared<SessionOwnerWS>(std::move(socket));
         }
         owner->setCommonServerOptions();
-        auto session = m_sessionFactory();
         session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(owner->executor());
         owner->setSession(std::move(session));
 

@@ -17,6 +17,8 @@
 #include <deque>
 #include <optional>
 
+constexpr uint16_t Test_Port = 7654;
+
 struct Packet
 {
     bool istext = false;
@@ -65,7 +67,7 @@ class TestClientSession final : public fishnets::WebSocketSession
     {
         auto ep = wsGetEndpointInfo();
         CHECK(ep.address == "127.0.0.1");
-        CHECK(ep.port == 7654);
+        CHECK(ep.port == Test_Port);
 
         sendNext();
     }
@@ -101,6 +103,7 @@ class TestClientSession final : public fishnets::WebSocketSession
         sendNext();
     }
 
+public:
     size_t sendIndex = 0;
     size_t receivedIndex = 0;
 };
@@ -158,13 +161,34 @@ class TestServerSession final : public fishnets::WebSocketSession
     size_t receivedIndex = 0;
 };
 
-fishnets::WebSocketSessionPtr Make_ServerSession() { return std::make_shared<TestServerSession>(); }
+fishnets::WebSocketSessionPtr Make_ServerSession(const fishnets::WebSocketEndpointInfo& info)
+{
+    CHECK(info.address == "127.0.0.1");
+    return std::make_shared<TestServerSession>();
+}
 
 TEST_CASE("basic")
 {
-    const uint16_t port = 7654;
-    fishnets::WebSocketServer server(Make_ServerSession, port, 1, testServerSSLSettings.get());
+    fishnets::WebSocketServer server(Make_ServerSession, Test_Port, 1, testServerSSLSettings.get());
 
     auto clientSession = std::make_shared<TestClientSession>();
-    fishnets::WebSocketClient client(clientSession, "localhost", port, testClientSSLSettings.get());
+    fishnets::WebSocketClient client(clientSession, "localhost", Test_Port, testClientSSLSettings.get());
+    CHECK(clientSession->sendIndex == packets.size());
+    CHECK(clientSession->receivedIndex == packets.size());
+}
+
+fishnets::WebSocketSessionPtr Deny_ServerSession(const fishnets::WebSocketEndpointInfo& info)
+{
+    CHECK(info.address == "127.0.0.1");
+    return {};
+}
+
+TEST_CASE("server decline")
+{
+    fishnets::WebSocketServer server(Deny_ServerSession, Test_Port, 1, testServerSSLSettings.get());
+
+    auto clientSession = std::make_shared<TestClientSession>();
+    fishnets::WebSocketClient client(clientSession, "localhost", Test_Port, testClientSSLSettings.get());
+    CHECK(clientSession->sendIndex == 0);
+    CHECK(clientSession->receivedIndex == 0);
 }

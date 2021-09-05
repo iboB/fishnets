@@ -58,7 +58,7 @@ class EchoServerSession final : public fishnets::WebSocketSession
     std::string m_sent;
 };
 
-fishnets::WebSocketSessionPtr makeSession()
+fishnets::WebSocketSessionPtr makeSession(const fishnets::WebSocketEndpointInfo&)
 {
     return std::make_shared<EchoServerSession>();
 }
