@@ -122,13 +122,13 @@ private:
             m_serverConnectionThread.join();
             std::cout << "App has shut down. Press <ENTER> to quit.\n";
         }
-        else if (m_currentConnectedSession)
+        else if (!m_currentConnectedSession)
         {
-            m_currentConnectedSession->send(std::move(command));
+            std::cout << "No session is currently connected\n";
         }
         else
         {
-            std::cout << "No session is currently connected\n";
+            m_currentConnectedSession->send(std::move(command));
         }
     }
 
