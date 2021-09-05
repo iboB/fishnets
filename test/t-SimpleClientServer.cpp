@@ -192,3 +192,10 @@ TEST_CASE("server decline")
     CHECK(clientSession->sendIndex == 0);
     CHECK(clientSession->receivedIndex == 0);
 }
+
+TEST_CASE("client decline")
+{
+    // nothing special to check here
+    // just that a client with null session executes correctly without blocking or crashing
+    fishnets::WebSocketClient({}, "localhost", Test_Port, testClientSSLSettings.get());
+}

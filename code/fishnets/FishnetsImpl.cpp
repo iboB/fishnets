@@ -431,6 +431,8 @@ public:
 
 WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string& addr, uint16_t port, WebSocketClientSSLSettings* sslSettings)
 {
+    if (!session) return;
+
     net::io_context ctx(1);
 #if FISHNETS_ENABLE_SSL
     std::unique_ptr<net::ssl::context> sslCtx;
