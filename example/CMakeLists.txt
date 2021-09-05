@@ -1,5 +1,15 @@
-add_executable(echo-server e-EchoServer.cpp)
-target_link_libraries(echo-server fishnets)
+macro(fishnets_example example)
+    add_executable(${example} ${ARGN})
+    target_link_libraries(${example} fishnets)
+endmacro()
 
-add_executable(oneshot-client e-OneshotClient.cpp)
-target_link_libraries(oneshot-client fishnets)
+CPMAddPackage(
+    NAME xec
+    GITHUB_REPOSITORY iboB/xec
+    VERSION 1.3.0
+)
+
+fishnets_example(echo-server e-EchoServer.cpp)
+fishnets_example(oneshot-client e-OneshotClient.cpp)
+fishnets_example(terminal-client e-TerminalClient.cpp)
+target_link_libraries(terminal-client xec)
