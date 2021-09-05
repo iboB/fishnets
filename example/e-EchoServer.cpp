@@ -7,6 +7,7 @@
 //
 #include <fishnets/WebSocketServer.hpp>
 #include <fishnets/WebSocketSession.hpp>
+#include <fishnets/WebSocketEndpointInfo.hpp>
 #include <fishnets/WebSocketServerSSLSettings.hpp>
 
 #include <iostream>

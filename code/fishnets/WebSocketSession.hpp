@@ -12,7 +12,6 @@
 #include <memory>
 #include <string_view>
 #include <functional>
-#include <string>
 
 namespace fishnets
 {
@@ -20,6 +19,7 @@ class Server;
 class SessionOwnerBase;
 class ExecutorHolder;
 class WebSocketClient;
+struct WebSocketEndpointInfo;
 
 // the lifetime of a session is managed via a shared pointer to this
 class FISHNETS_API WebSocketSession
@@ -56,13 +56,7 @@ public:
     void wsSend(std::string_view text);
     virtual void wsCompletedSend() = 0;
 
-    struct EndpointInfo
-    {
-        std::string address;
-        uint16_t port;
-    };
-
-    EndpointInfo wsGetEndpointInfo() const;
+    WebSocketEndpointInfo wsGetEndpointInfo() const;
 
 protected:
     WebSocketSession();

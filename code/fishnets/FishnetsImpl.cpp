@@ -11,6 +11,7 @@
 #include "WebSocketServerSSLSettings.hpp"
 
 #include "WebSocketSession.hpp"
+#include "WebSocketEndpointInfo.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
 #define BOOST_ASIO_USE_TS_EXECUTOR_AS_DEFAULT 1
@@ -131,7 +132,7 @@ public:
 
     // util
 
-    virtual WebSocketSession::EndpointInfo getEndpointInfo() = 0;
+    virtual WebSocketEndpointInfo getEndpointInfo() = 0;
 
     virtual void setCommonServerOptions() = 0;
     virtual void setCommonClientOptions() = 0;
@@ -215,7 +216,7 @@ void WebSocketSession::wsSend(std::string_view text)
     m_owner->write(true, net::buffer(text));
 }
 
-WebSocketSession::EndpointInfo WebSocketSession::wsGetEndpointInfo() const
+WebSocketEndpointInfo WebSocketSession::wsGetEndpointInfo() const
 {
     if (!m_owner) return {};
     return m_owner->getEndpointInfo();
@@ -293,11 +294,11 @@ public:
     }
 
     // util
-    WebSocketSession::EndpointInfo getEndpointInfo() override final
+    WebSocketEndpointInfo getEndpointInfo() override final
     {
         auto ep = beast::get_lowest_layer(m_ws).remote_endpoint();
 
-        WebSocketSession::EndpointInfo ret;
+        WebSocketEndpointInfo ret;
         ret.address = ep.address().to_string();
         ret.port = ep.port();
 

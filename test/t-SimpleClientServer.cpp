@@ -11,6 +11,7 @@
 #include <fishnets/WebSocketClient.hpp>
 #include <fishnets/WebSocketServer.hpp>
 #include <fishnets/WebSocketSession.hpp>
+#include <fishnets/WebSocketEndpointInfo.hpp>
 
 #include <cstring>
 #include <deque>
