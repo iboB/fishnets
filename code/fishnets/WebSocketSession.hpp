@@ -64,6 +64,8 @@ public:
 
     WebSocketEndpointInfo wsGetEndpointInfo() const;
 
+    void wsSetOptions(const WebSocketSessionOptions& options);
+
 protected:
     WebSocketSession();
     // intentionally not virtual. Objects are not owned through this, but instead through shared pointers

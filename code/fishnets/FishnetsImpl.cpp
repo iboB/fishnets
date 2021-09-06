@@ -138,6 +138,8 @@ public:
     virtual void setInitialServerOptions(WebSocketSessionOptions opts) = 0;
     virtual void setInitialClientOptions(WebSocketSessionOptions opts) = 0;
 
+    virtual void setOptions(const WebSocketSessionOptions& opts) = 0;
+
     void failed(beast::error_code e, const char* source)
     {
         std::cerr << source << " error: " << e.message() << '\n';
@@ -226,6 +228,12 @@ WebSocketEndpointInfo WebSocketSession::wsGetEndpointInfo() const
 {
     if (!m_owner) return {};
     return m_owner->getEndpointInfo();
+}
+
+void WebSocketSession::wsSetOptions(const WebSocketSessionOptions& options)
+{
+    if (!m_owner) return;
+    m_owner->setOptions(options);
 }
 
 namespace
@@ -342,6 +350,24 @@ public:
         m_ws.set_option(bsb::decorator([id = std::move(id)](beast::websocket::request_type& req) {
             req.set(beast::http::field::user_agent, id);
         }));
+    }
+
+    void setOptions(const WebSocketSessionOptions& opts) final override
+    {
+        if (opts.maxIncomingMessageSize)
+        {
+            m_ws.read_message_max(*opts.maxIncomingMessageSize);
+        }
+
+        if (opts.idleTimeout)
+        {
+            beast::websocket::stream_base::timeout t;
+            m_ws.get_option(t);
+            t.idle_timeout = *opts.idleTimeout;
+            m_ws.set_option(t);
+        }
+
+        // ignore id, as it's only valid when connecting
     }
 };
 
