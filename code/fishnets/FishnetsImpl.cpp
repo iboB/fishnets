@@ -11,6 +11,7 @@
 #include "WebSocketServerSSLSettings.hpp"
 
 #include "WebSocketSession.hpp"
+#include "WebSocketSessionOptions.hpp"
 #include "WebSocketEndpointInfo.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
@@ -134,8 +135,8 @@ public:
 
     virtual WebSocketEndpointInfo getEndpointInfo() = 0;
 
-    virtual void setCommonServerOptions() = 0;
-    virtual void setCommonClientOptions() = 0;
+    virtual void setInitialServerOptions(WebSocketSessionOptions opts) = 0;
+    virtual void setInitialClientOptions(WebSocketSessionOptions opts) = 0;
 
     void failed(beast::error_code e, const char* source)
     {
@@ -169,6 +170,11 @@ public:
 WebSocketSession::WebSocketSession() = default;
 
 WebSocketSession::~WebSocketSession() = default;
+
+WebSocketSessionOptions WebSocketSession::getInitialOptions()
+{
+    return {};
+}
 
 void WebSocketSession::opened(SessionOwnerBase& session)
 {
@@ -292,13 +298,7 @@ public:
     {
         if (e) return failed(e, "ws connect");
 
-        // Set suggested timeout settings for the websocket
-        m_ws.set_option(beast::websocket::stream_base::timeout::suggested(beast::role_type::client));
-
-        // Set a decorator to change the User-Agent of the handshake
-        m_ws.set_option(beast::websocket::stream_base::decorator([](beast::websocket::request_type& req) {
-            req.set(beast::http::field::user_agent, std::string(BOOST_BEAST_VERSION_STRING) + " ws-client");
-        }));
+        setInitialClientOptions(m_session->getInitialOptions());
 
         m_ws.async_handshake(m_host, "/",
             beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
@@ -310,26 +310,38 @@ public:
         return getEndpointInfoOf(m_ws);
     }
 
-    void setCommonServerOptions() override final
+    void setInitialServerOptions(WebSocketSessionOptions opts) override final
     {
-        m_ws.read_message_max(32 * 1024 * 1024);
+        m_ws.read_message_max(opts.maxIncomingMessageSize.value_or(16*1024*1024));
 
-        m_ws.set_option(beast::websocket::stream_base::decorator([](beast::websocket::response_type& res) {
-            res.set(beast::http::field::server, std::string(BOOST_BEAST_VERSION_STRING) + " fishnets-ws-server");
+        using bsb = beast::websocket::stream_base;
+        auto timeout = bsb::timeout::suggested(beast::role_type::server);
+        if (opts.idleTimeout) timeout.idle_timeout = *opts.idleTimeout;
+        m_ws.set_option(timeout);
+
+        auto id = opts.hostId.value_or(
+            std::string(BOOST_BEAST_VERSION_STRING) + " fishnets-ws-server"
+        );
+        m_ws.set_option(bsb::decorator([id = std::move(id)](beast::websocket::response_type& res) {
+            res.set(beast::http::field::server, id);
         }));
-
-        m_ws.set_option(beast::websocket::stream_base::timeout::suggested(beast::role_type::server));
     }
 
-    void setCommonClientOptions() override final
+    void setInitialClientOptions(WebSocketSessionOptions opts) override final
     {
-        m_ws.read_message_max(2 * 1024 * 1024);
+        m_ws.read_message_max(opts.maxIncomingMessageSize.value_or(2*1024*1024));
 
-        m_ws.set_option(beast::websocket::stream_base::decorator([](beast::websocket::response_type& res) {
-            res.set(beast::http::field::user_agent, std::string(BOOST_BEAST_VERSION_STRING) + " fishnets-ws-client");
+        using bsb = beast::websocket::stream_base;
+        auto timeout = bsb::timeout::suggested(beast::role_type::client);
+        if (opts.idleTimeout) timeout.idle_timeout = *opts.idleTimeout;
+        m_ws.set_option(timeout);
+
+        auto id = opts.hostId.value_or(
+            std::string(BOOST_BEAST_VERSION_STRING) + " fishnets-ws-client"
+        );
+        m_ws.set_option(bsb::decorator([id = std::move(id)](beast::websocket::request_type& req) {
+            req.set(beast::http::field::user_agent, id);
         }));
-
-        m_ws.set_option(beast::websocket::stream_base::timeout::suggested(beast::role_type::client));
     }
 };
 
@@ -477,8 +489,6 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
         {
             owner = std::make_shared<SessionOwnerWS>(ctx);
         }
-        owner->setCommonClientOptions();
-
         session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(ctx.get_executor());
         owner->setSession(std::move(session));
 
@@ -584,7 +594,7 @@ public:
         {
             owner = std::make_shared<SessionOwnerWS>(std::move(socket));
         }
-        owner->setCommonServerOptions();
+        owner->setInitialServerOptions(session->getInitialOptions());
         session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(owner->executor());
         owner->setSession(std::move(session));
 

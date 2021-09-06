@@ -20,6 +20,7 @@ class SessionOwnerBase;
 class ExecutorHolder;
 class WebSocketClient;
 struct WebSocketEndpointInfo;
+struct WebSocketSessionOptions;
 
 // the lifetime of a session is managed via a shared pointer to this
 class FISHNETS_API WebSocketSession
@@ -29,6 +30,11 @@ public:
     WebSocketSession& operator=(const WebSocketSession&) = delete;
     WebSocketSession(WebSocketSession&&) noexcept = delete;
     WebSocketSession& operator=(WebSocketSession&&) noexcept = delete;
+
+    // will be called on the IO thread shortly after construction to get the initial options.
+    // no calls to the interface are allowed in this function, not even postWSIOTask
+    // the default implementation returns default-constructed WebSocketSessionOptions
+    virtual WebSocketSessionOptions getInitialOptions();
 
     // post a task to be executed on the io thread of the session
     // THIS IS THE ONLY FUNCTION WHICH IS VALID ON ANY THREAD
