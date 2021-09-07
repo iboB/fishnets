@@ -328,7 +328,7 @@ public:
         m_ws.set_option(timeout);
 
         auto id = opts.hostId.value_or(
-            std::string(BOOST_BEAST_VERSION_STRING) + " fishnets-ws-server"
+            std::string("fishnets-ws-server ") + BOOST_BEAST_VERSION_STRING
         );
         m_ws.set_option(bsb::decorator([id = std::move(id)](beast::websocket::response_type& res) {
             res.set(beast::http::field::server, id);
@@ -345,7 +345,7 @@ public:
         m_ws.set_option(timeout);
 
         auto id = opts.hostId.value_or(
-            std::string(BOOST_BEAST_VERSION_STRING) + " fishnets-ws-client"
+            std::string("fishnets-ws-client ") + BOOST_BEAST_VERSION_STRING
         );
         m_ws.set_option(bsb::decorator([id = std::move(id)](beast::websocket::request_type& req) {
             req.set(beast::http::field::user_agent, id);
