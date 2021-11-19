@@ -7,11 +7,8 @@ include(./get_cpm.cmake)
 
 #######################################
 # cmake lib
-CPMAddPackage(
-    NAME icm
-    GITHUB_REPOSITORY iboB/icm
-    VERSION 1.3.1
-)
+CPMAddPackage(gh:iboB/icm@1.3.2)
+
 set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
     ${icm_SOURCE_DIR}
@@ -35,16 +32,8 @@ endif()
 
 #######################################
 # packages
-CPMAddPackage(
-    NAME splat
-    GITHUB_REPOSITORY iboB/splat
-    VERSION 1.0.0
-)
-CPMAddPackage(
-    NAME itlib
-    GITHUB_REPOSITORY iboB/itlib
-    VERSION 1.2.2
-)
+CPMAddPackage(gh:iboB/splat@1.1.0)
+CPMAddPackage(gh:iboB/itlib@1.4.5)
 
 find_package(Threads REQUIRED)
 if(FISHNETS_SSL)

@@ -1,16 +1,7 @@
 include(icm_testing)
 
-CPMAddPackage(
-    NAME doctest-lib
-    GITHUB_REPOSITORY iboB/doctest-lib
-    GIT_TAG 2.4.4
-)
-
-CPMAddPackage(
-    NAME xec
-    GITHUB_REPOSITORY iboB/xec
-    VERSION 1.3.0
-)
+CPMAddPackage(gh:iboB/doctest-lib@2.4.6)
+CPMAddPackage(gh:iboB/xec@1.3.1)
 
 add_library(TestSSLSettings STATIC TestSSLSettings.cpp)
 target_link_libraries(TestSSLSettings PUBLIC fishnets)

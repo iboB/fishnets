@@ -3,11 +3,7 @@ macro(fishnets_example example)
     target_link_libraries(${example} fishnets)
 endmacro()
 
-CPMAddPackage(
-    NAME xec
-    GITHUB_REPOSITORY iboB/xec
-    VERSION 1.3.0
-)
+CPMAddPackage(gh:iboB/xec@1.3.1)
 
 fishnets_example(echo-server e-EchoServer.cpp)
 fishnets_example(oneshot-client e-OneshotClient.cpp)
