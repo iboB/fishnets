@@ -48,10 +48,18 @@ namespace fishnets
 class ExecutorHolder
 {
 public:
-    ExecutorHolder(net::executor&& ex)
+    ExecutorHolder(net::executor&& ex, const WebSocketSessionPtr& session)
         : executor(std::move(ex))
+        , sessionSharedFromThis(session)
     {}
+
     net::executor executor;
+
+    // a poor man's shared-from this implementation, to avoid actually inheriting std::enable_shared_from_this
+    // and leave that (optional) inehritance to the user
+    // it's used to extend the lifetime of the session when wsio tasks are posted so that
+    // a plain [this] capture is possible in postWSIOTask
+    std::weak_ptr<WebSocketSession> sessionSharedFromThis;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -193,7 +201,12 @@ void WebSocketSession::closed()
 
 void WebSocketSession::postWSIOTask(std::function<void()> task)
 {
-    net::dispatch(m_ioExecutorHolder->executor, std::move(task));
+    net::dispatch(m_ioExecutorHolder->executor,
+        [self = m_ioExecutorHolder->sessionSharedFromThis.lock(), task = std::move(task)]() {
+            assert(self); // this can only fail if we're posting a taks in the session's destructor, which is definitely not a good idea
+            task();
+        }
+    );
 }
 
 void WebSocketSession::wsClose()
@@ -515,7 +528,7 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
         {
             owner = std::make_shared<SessionOwnerWS>(ctx);
         }
-        session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(ctx.get_executor());
+        session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(ctx.get_executor(), session);
         owner->setSession(std::move(session));
 
         // and initiate
@@ -621,7 +634,7 @@ public:
             owner = std::make_shared<SessionOwnerWS>(std::move(socket));
         }
         owner->setInitialServerOptions(session->getInitialOptions());
-        session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(owner->executor());
+        session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(owner->executor(), session);
         owner->setSession(std::move(session));
 
         // and initiate

@@ -17,3 +17,4 @@ endmacro()
 
 fishnets_dual_test(SimpleClientServer t-SimpleClientServer.cpp)
 fishnets_dual_test(ServerMainThread t-ServerMainThread.cpp)
+fishnets_dual_test(PostAfterClose t-PostAfterClose.cpp)
