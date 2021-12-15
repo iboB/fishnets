@@ -19,6 +19,8 @@
 
 constexpr uint16_t Test_Port = 7654;
 
+TEST_SUITE_BEGIN("fishnets");
+
 struct Packet
 {
     bool istext = false;

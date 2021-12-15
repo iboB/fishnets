@@ -17,6 +17,8 @@
 
 #include <list>
 
+TEST_SUITE_BEGIN("fishnets");
+
 struct Packet
 {
     bool istext = false;
@@ -305,7 +307,7 @@ public:
     int acks = 0;
 };
 
-TEST_CASE("test")
+TEST_CASE("server client threads")
 {
     xec::ThreadExecutionContext executionContext;
     Server server;
