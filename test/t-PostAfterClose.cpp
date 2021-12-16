@@ -61,11 +61,13 @@ class TestServerSession final : public fishnets::WebSocketSession
     void wsCompletedSend() override {}
 
 public:
-    ~TestServerSession() {
+    ~TestServerSession()
+    {
         serverSessionDestroyed = true; // destoyed, so not leaked
     }
 
-    void postAfterClose() {
+    void postAfterClose()
+    {
         postWSIOTask([this]() {
             wsSend("foo"); // should safely fail (but also touch "this")
             opened = true; // definitely touch "this"

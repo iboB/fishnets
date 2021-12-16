@@ -55,8 +55,8 @@ public:
 
     net::executor executor;
 
-    // a poor man's shared-from this implementation, to avoid actually inheriting std::enable_shared_from_this
-    // and leave that (optional) inehritance to the user
+    // a poor man's shared-from this implementation, to avoid actually inheriting std::enable_shared_from_this in sessions
+    // and leave that (optional) inheritance to the user
     // it's used to extend the lifetime of the session when wsio tasks are posted so that
     // a plain [this] capture is possible in postWSIOTask
     std::weak_ptr<WebSocketSession> sessionSharedFromThis;

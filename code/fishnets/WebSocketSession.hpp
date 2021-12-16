@@ -39,6 +39,8 @@ public:
     // post a task to be executed on the io thread of the session
     // THIS IS THE ONLY FUNCTION WHICH IS VALID ON ANY THREAD
     // ONLY CALL wsSend and wsClose from within a posted task
+    // posting a task will extend the lifetime of the posting session until the task is complete
+    // thus capturing [this] or members by ref, when posting from a session, is safe
     void postWSIOTask(std::function<void()> task);
 
     // called when socked connection is established
