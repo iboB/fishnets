@@ -44,14 +44,12 @@ if(ICM_DEV_MODE)
     # only add boost in dev mode
     # otherwise rely on the external project providing it
     CPMAddPackage(
-        NAME Boost
-        VERSION 1.78.0
-        GITHUB_REPOSITORY "boostorg/boost"
-        GIT_TAG "boost-1.78.0"
-        EXCLUDE_FROM_ALL YES
-        OPTIONS "BOOST_INCLUDE_LIBRARIES beast"
-        GIT_SHALLOW TRUE
+          NAME boost-cmake
+          GITHUB_REPOSITORY iboB/boost-cmake
+          GIT_TAG 020d3769fff0eecc5ba3220ecfa85d7ef1b1f136
     )
+    add_library(boost-beast INTERFACE)
+    target_link_libraries(boost-beast INTERFACE Boost::boost)
 endif()
 
 #######################################

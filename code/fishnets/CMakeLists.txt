@@ -6,7 +6,7 @@ icm_bigobj(FishnetsImpl.cpp)
 
 target_link_libraries(fishnets
     PRIVATE
-        Boost::beast
+        boost-beast
         ${CMAKE_THREAD_LIBS_INIT}
     PUBLIC
         splat
