@@ -1,5 +1,5 @@
 // fishnets
-// Copyright (c) 2021 Borislav Stanimirov
+// Copyright (c) 2021-2022 Borislav Stanimirov
 //
 // Distributed under the MIT Software License
 // See accompanying file LICENSE or copy at
