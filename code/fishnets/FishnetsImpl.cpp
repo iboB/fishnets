@@ -480,38 +480,20 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 // client
 
-WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string& addr, uint16_t port, WebSocketClientSSLSettings* sslSettings)
+class Client
 {
-    if (!session) return;
-
-    net::io_context ctx(1);
-#if FISHNETS_ENABLE_SSL
-    std::unique_ptr<net::ssl::context> sslCtx;
-#endif
-
+public:
+    Client(WebSocketSessionFactoryFunc sessionFactory, WebSocketClientSSLSettings* sslSettings)
+        : m_sessionFactory(std::move(sessionFactory))
     {
-        // tcp::resolver resolver{net::io_context::strand(ctx)};
-        tcp::resolver resolver{ctx};
-
-        char portstr[6] = {};
-        std::to_chars(portstr, portstr+6, port);
-        auto results = resolver.resolve(tcp::v4(), addr, portstr);
-        if (results.empty())
-        {
-            std::cerr << "Could not resolve " << addr << '\n';
-            return;
-        }
-
-        // init session and owner
-        std::shared_ptr<SessionOwnerBase> owner;
         if (sslSettings)
         {
 #if FISHNETS_ENABLE_SSL
-            sslCtx.reset(new net::ssl::context(net::ssl::context::tlsv12_client));
+            m_sslCtx.reset(new net::ssl::context(net::ssl::context::tlsv12_client));
             boost::system::error_code ec;
             for (auto& cert : sslSettings->customCertificates)
             {
-                sslCtx->add_certificate_authority(boost::asio::buffer(cert), ec);
+                m_sslCtx->add_certificate_authority(boost::asio::buffer(cert), ec);
                 if (ec) break;
             }
             if (ec)
@@ -519,16 +501,51 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
                 std::cerr << "Could not load custom certificates: " << ec.message() << '\n';
                 return;
             }
-            owner = std::make_shared<SessionOwnerSSL>(ctx, *sslCtx);
 #else
             std::terminate();
 #endif
         }
-        else
+    }
+
+    bool initConnection(const std::string& addr, uint16_t port)
+    {
+        // tcp::resolver resolver{net::io_context::strand(ctx)};
+        tcp::resolver resolver{m_ctx};
+
+        char portstr[6] = {};
+        std::to_chars(portstr, portstr+6, port);
+        auto results = resolver.resolve(tcp::v4(), addr, portstr);
+        if (results.empty())
         {
-            owner = std::make_shared<SessionOwnerWS>(ctx);
+            std::cerr << "Could not resolve " << addr << '\n';
+            return false;
         }
-        session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(ctx.get_executor(), session);
+
+        WebSocketEndpointInfo info;
+        info.address = addr;
+        info.port = port;
+        auto session = m_sessionFactory(info);
+        if (!session)
+        {
+            std::cout << "session declined\n";
+            return false;
+        }
+        session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(m_ctx.get_executor(), session);
+
+        // init session and owner
+        std::shared_ptr<SessionOwnerBase> owner;
+#if FISHNETS_ENABLE_SSL
+        if (m_sslCtx)
+        {
+
+            owner = std::make_shared<SessionOwnerSSL>(m_ctx, *m_sslCtx);
+        }
+        else
+#endif
+        {
+            owner = std::make_shared<SessionOwnerWS>(m_ctx);
+        }
+
         owner->setSession(std::move(session));
 
         // and initiate
@@ -536,9 +553,44 @@ WebSocketClient::WebSocketClient(WebSocketSessionPtr session, const std::string&
         owner->m_host += ':';
         owner->m_host += portstr;
         owner->connect(results.begin()->endpoint());
+
+        return true;
     }
 
-    ctx.run();
+    void connect(const std::string& addr, uint16_t port)
+    {
+        if (!initConnection(addr, port)) return;
+        m_ctx.run();
+    }
+
+    void stop()
+    {
+        m_ctx.stop();
+    }
+private:
+    net::io_context m_ctx;
+#if FISHNETS_ENABLE_SSL
+    std::unique_ptr<net::ssl::context> m_sslCtx;
+#endif
+
+    WebSocketSessionFactoryFunc m_sessionFactory;
+};
+
+WebSocketClient::WebSocketClient(WebSocketSessionFactoryFunc sessionFactory, WebSocketClientSSLSettings* sslSettings)
+    : m_client(new Client(sessionFactory, sslSettings))
+{
+}
+
+WebSocketClient::~WebSocketClient() = default;
+
+void WebSocketClient::connect(const std::string& addr, uint16_t port)
+{
+    m_client->connect(addr, port);
+}
+
+void WebSocketClient::stop()
+{
+    m_client->stop();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -154,7 +154,11 @@ private:
     {
         while (true)
         {
-            fishnets::WebSocketClient client(std::make_shared<Session>(*this), "localhost", 7654);
+            fishnets::WebSocketClient client([this](const fishnets::WebSocketEndpointInfo&) {
+                return std::make_shared<Session>(*this);
+            });
+
+            client.connect("localhost", 7654);
             pushTask([this]() { onClientDisconnected(); });
             if (active())
             {

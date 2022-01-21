@@ -16,9 +16,9 @@
 namespace fishnets
 {
 class Server;
+class Client;
 class SessionOwnerBase;
 class ExecutorHolder;
-class WebSocketClient;
 struct WebSocketEndpointInfo;
 struct WebSocketSessionOptions;
 
@@ -75,7 +75,7 @@ protected:
 
 private:
     friend class Server;
-    friend class WebSocketClient;
+    friend class Client;
     friend class SessionOwnerBase;
 
     SessionOwnerBase* m_owner = nullptr;

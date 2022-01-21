@@ -169,14 +169,35 @@ fishnets::WebSocketSessionPtr Make_ServerSession(const fishnets::WebSocketEndpoi
     return std::make_shared<TestServerSession>();
 }
 
-TEST_CASE("basic")
+struct TestClient
+{
+    TestClient()
+    {
+        m_client.reset(new fishnets::WebSocketClient(std::bind(&TestClient::makeSession, this, std::placeholders::_1), testClientSSLSettings.get()));
+        m_client->connect("localhost", Test_Port);
+    }
+
+    fishnets::WebSocketSessionPtr makeSession(const fishnets::WebSocketEndpointInfo& info)
+    {
+        CHECK(!session);
+        CHECK(info.address == "localhost");
+        CHECK(info.port == Test_Port);
+        session = std::make_shared<TestClientSession>();
+        return session;
+    }
+
+    std::unique_ptr<fishnets::WebSocketClient> m_client;
+    std::shared_ptr<TestClientSession> session;
+};
+
+TEST_CASE("connect")
 {
     fishnets::WebSocketServer server(Make_ServerSession, Test_Port, 1, testServerSSLSettings.get());
 
-    auto clientSession = std::make_shared<TestClientSession>();
-    fishnets::WebSocketClient client(clientSession, "localhost", Test_Port, testClientSSLSettings.get());
-    CHECK(clientSession->sendIndex == packets.size());
-    CHECK(clientSession->receivedIndex == packets.size());
+    TestClient client;
+    REQUIRE(client.session);
+    CHECK(client.session->sendIndex == packets.size());
+    CHECK(client.session->receivedIndex == packets.size());
 }
 
 fishnets::WebSocketSessionPtr Deny_ServerSession(const fishnets::WebSocketEndpointInfo& info)
@@ -189,15 +210,19 @@ TEST_CASE("server decline")
 {
     fishnets::WebSocketServer server(Deny_ServerSession, Test_Port, 1, testServerSSLSettings.get());
 
-    auto clientSession = std::make_shared<TestClientSession>();
-    fishnets::WebSocketClient client(clientSession, "localhost", Test_Port, testClientSSLSettings.get());
-    CHECK(clientSession->sendIndex == 0);
-    CHECK(clientSession->receivedIndex == 0);
+    TestClient client;
+    REQUIRE(client.session);
+    CHECK(client.session->sendIndex == 0);
+    CHECK(client.session->receivedIndex == 0);
 }
 
 TEST_CASE("client decline")
 {
     // nothing special to check here
-    // just that a client with null session executes correctly without blocking or crashing
-    fishnets::WebSocketClient({}, "localhost", Test_Port, testClientSSLSettings.get());
+    // just that a client which declines sessions executes correctly without blocking or crashing
+    fishnets::WebSocketServer server(Make_ServerSession, Test_Port, 1, testServerSSLSettings.get());
+    fishnets::WebSocketClient client(
+        [](const fishnets::WebSocketEndpointInfo&) { return fishnets::WebSocketSessionPtr{}; },
+        testClientSSLSettings.get());
+    client.connect("localhost", Test_Port);
 }

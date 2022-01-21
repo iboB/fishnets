@@ -82,7 +82,6 @@ public:
 constexpr uint16_t Test_Port = 7654;
 
 std::shared_ptr<TestServerSession> serverSession;
-
 fishnets::WebSocketSessionPtr Make_ServerSession(const fishnets::WebSocketEndpointInfo&)
 {
     REQUIRE(!serverSession);
@@ -90,14 +89,24 @@ fishnets::WebSocketSessionPtr Make_ServerSession(const fishnets::WebSocketEndpoi
     return serverSession;
 }
 
+std::shared_ptr<TestClientSession> clientSession;
+fishnets::WebSocketSessionPtr Make_ClientSession(const fishnets::WebSocketEndpointInfo&)
+{
+    REQUIRE(!clientSession);
+    clientSession = std::make_shared<TestClientSession>();
+    return clientSession;
+}
+
 TEST_CASE("post after close")
 {
     fishnets::WebSocketServer server(Make_ServerSession, Test_Port, 1, testServerSSLSettings.get());
 
     {
-        auto clientSession = std::make_shared<TestClientSession>();
-        fishnets::WebSocketClient client(clientSession, "localhost", Test_Port, testClientSSLSettings.get());
+        fishnets::WebSocketClient client(Make_ClientSession, testClientSSLSettings.get());
+        client.connect("localhost", Test_Port);
         CHECK(clientSession->receivedPackages == 0);
+        CHECK(clientSession.use_count() == 1);
+        clientSession.reset();
     }
 
     REQUIRE(serverSession);

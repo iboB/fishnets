@@ -325,10 +325,9 @@ TEST_CASE("server client threads")
     {
         wsClientThreads.emplace_back([i]() {
             fishnets::WebSocketClient client(
-                std::make_shared<TestClientSession>(i),
-                "localhost",
-                port,
+                [i](const fishnets::WebSocketEndpointInfo&) { return std::make_shared<TestClientSession>(i); },
                 testClientSSLSettings.get());
+            client.connect("localhost", port);
         });
     }
 

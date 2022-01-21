@@ -8,7 +8,7 @@
 #pragma once
 #include "API.h"
 
-#include "WebSocketSessionPtr.hpp"
+#include "WebSocketSessionFactory.hpp"
 
 #include <cstdint>
 #include <string>
@@ -16,16 +16,31 @@
 namespace fishnets
 {
 struct WebSocketClientSSLSettings;
+class Client;
 
 class FISHNETS_API WebSocketClient
 {
 public:
-    // constructing a client will block the current thread until the client session is closed
-    WebSocketClient(
-        WebSocketSessionPtr session,
-        const std::string& addr,
-        uint16_t port,
-        WebSocketClientSSLSettings* sslSettings = nullptr);
+    WebSocketClient(WebSocketSessionFactoryFunc sessionFactory, WebSocketClientSSLSettings* sslSettings = nullptr);
+    ~WebSocketClient();
+
+    // Blocks the current thread until the client session is closed
+    // Multiple connections (even concurrent ones) are valid
+    void connect(const std::string& addr, uint16_t port);
+
+    // Stops the client: disconnects connected sessions and prevents subsequent connections
+    // Effectively causes all active connections to exit immediately if connectionning and in subsequent calls
+    // valid on any thread
+    // Caling this is not necessary if connection has already exited and it's simply never called again
+    void stop();
+
+    WebSocketClient(const WebSocketClient&) = delete;
+    WebSocketClient& operator=(const WebSocketClient&) = delete;
+    WebSocketClient(WebSocketClient&&) noexcept = delete;
+    WebSocketClient& operator=(WebSocketClient&&) noexcept = delete;
+
+private:
+    std::unique_ptr<Client> m_client;
 };
 
 }
