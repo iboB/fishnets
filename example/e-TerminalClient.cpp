@@ -8,9 +8,6 @@
 #include <fishnets/WebSocketClient.hpp>
 #include <fishnets/WebSocketSession.hpp>
 
-#include <xec/TaskExecutor.hpp>
-#include <xec/ThreadExecution.hpp>
-
 #include <atomic>
 #include <iostream>
 #include <queue>
@@ -18,6 +15,7 @@
 #include <optional>
 #include <cassert>
 #include <chrono>
+#include <mutex>
 
 class App;
 
@@ -86,95 +84,76 @@ private:
 
 using SessionPtr = std::shared_ptr<Session>;
 
-class App : public xec::TaskExecutor
+class App
 {
 public:
     App()
     {
+        m_client.emplace([this](const fishnets::WebSocketEndpointInfo&) {
+            return std::make_shared<Session>(*this);
+        });
         m_serverConnectionThread = std::thread([this]() { runServerConnectionThread(); });
     }
 
     // any thread
-    bool active() const { return m_active.load(std::memory_order_relaxed); }
+    bool active() const { return m_active.load(std::memory_order_acquire); }
 
     void sendCommand(std::string cmd)
     {
-        pushTask([this, cmd=std::move(cmd)]() mutable { onCommand(std::move(cmd)); });
-    }
-
-    void sessionConnected(SessionPtr session)
-    {
-        pushTask([this, session]() { onSessionConnected(session); });
-    }
-
-private:
-    // app thread
-    void onCommand(std::string command)
-    {
-        if (command == "/quit")
+        if (cmd == "/quit")
         {
-            m_active.store(false, std::memory_order_relaxed);
-            stop();
-            if (m_currentConnectedSession)
-            {
-                m_currentConnectedSession->disconnect();
-            }
+            m_active.store(false, std::memory_order_release);
+            m_client->stop();
             m_serverConnectionThread.join();
             std::cout << "App has shut down. Press <ENTER> to quit.\n";
+            return;
         }
-        else if (!m_currentConnectedSession)
+
+        std::lock_guard l(m_sessionMutex);
+        if (!m_currentConnectedSession)
         {
             std::cout << "No session is currently connected\n";
         }
         else
         {
-            m_currentConnectedSession->send(std::move(command));
+            m_currentConnectedSession->send(std::move(cmd));
         }
     }
 
-    void onClientDisconnected()
+    void sessionConnected(SessionPtr session)
     {
-        m_currentConnectedSession.reset();
-    }
-
-    void onSessionConnected(SessionPtr session)
-    {
-        assert(!m_currentConnectedSession);
-        if (!active())
-        {
-            session->disconnect();
-            return;
-        }
         std::cout << "Conection to the server was established\n";
+        std::lock_guard l(m_sessionMutex);
         m_currentConnectedSession = session;
+    }
+
+private:
+
+    void onSessionDisconnected()
+    {
+        std::lock_guard l(m_sessionMutex);
+        m_currentConnectedSession.reset();
     }
 
     // connection thrad
     void runServerConnectionThread()
     {
-        while (true)
+        while (active())
         {
-            fishnets::WebSocketClient client([this](const fishnets::WebSocketEndpointInfo&) {
-                return std::make_shared<Session>(*this);
-            });
-
-            client.connect("localhost", 7654);
-            pushTask([this]() { onClientDisconnected(); });
-            if (active())
-            {
-                std::cout << "Disconnected. Trying to reconnect...\n";
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-            }
-            else
-            {
-                break;
-            }
+            m_client->connect("localhost", 7654);
+            onSessionDisconnected();
+            std::cout << "Disconnected. Trying to reconnect...\n";
+            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            m_client->restart();
         }
     }
 
 private:
     std::atomic_bool m_active = true;
 
+    std::optional<fishnets::WebSocketClient> m_client;
+
+    std::mutex m_sessionMutex;
     SessionPtr m_currentConnectedSession;
 
     std::thread m_serverConnectionThread;
@@ -188,8 +167,6 @@ void Session::wsOpened()
 int main()
 {
     App app;
-    xec::ThreadExecution appExecution(app);
-    appExecution.launchThread("App");
 
     while (app.active())
     {
@@ -198,6 +175,5 @@ int main()
         app.sendCommand(std::move(cmd));
     }
 
-    appExecution.joinThread();
     return 0;
 }
