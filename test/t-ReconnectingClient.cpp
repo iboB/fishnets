@@ -14,7 +14,6 @@
 
 #include <atomic>
 #include <thread>
-#include <mutex>
 
 TEST_SUITE_BEGIN("fishnets");
 
@@ -31,24 +30,33 @@ class TestClientSession final : public fishnets::WebSocketSession
 
 class ClientConnectionManager {
 public:
+    ClientConnectionManager()
+        : m_client(
+            [](const fishnets::WebSocketEndpointInfo&) { return std::make_shared<TestClientSession>(); },
+            testClientSSLSettings.get())
+    {}
+
     int numAttempts() const { return m_numAttempts.load(std::memory_order_relaxed); }
 
     void start()
     {
-        m_session = std::make_shared<TestClientSession>();
+        m_running.store(true, std::memory_order_release);
         m_ioThread = std::thread([this]() { ioThread(); });
     }
 
     void stop()
     {
+        m_running.store(false, std::memory_order_release);
+        m_client.stop();
         m_ioThread.join();
     }
 
     void ioThread()
     {
-        while (true)
+        while (m_running.load(std::memory_order_acquire))
         {
-
+            m_numAttempts.fetch_add(1, std::memory_order_relaxed);
+            m_client.connect("localhost", Test_Port);
         }
     }
 
@@ -57,12 +65,14 @@ private:
     std::atomic_bool m_running;
 
     std::thread m_ioThread;
-
-    std::mutex m_sessionMutex;
-    std::shared_ptr<TestClientSession> m_session;
+    fishnets::WebSocketClient m_client;
 };
 
 TEST_CASE("failing client")
 {
+    ClientConnectionManager manager;
+    manager.start();
+    while (manager.numAttempts() < 3);
+    manager.stop();
 }
 
