@@ -28,10 +28,9 @@ public:
     // Multiple connections (even concurrent ones) are valid
     void connect(const std::string& addr, uint16_t port);
 
-    // Stops the client: disconnects connected sessions and prevents subsequent connections
-    // Effectively causes all active connections to exit immediately if connectionning and in subsequent calls
+    // Stops the client: disconnects currently connected sessions
     // valid on any thread
-    // Caling this is not necessary if connection has already exited and it's simply never called again
+    // Caling this is not necessary if connection has already exited and is simply never called again
     void stop();
 
     WebSocketClient(const WebSocketClient&) = delete;

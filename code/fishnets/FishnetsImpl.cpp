@@ -579,8 +579,7 @@ private:
 
 WebSocketClient::WebSocketClient(WebSocketSessionFactoryFunc sessionFactory, WebSocketClientSSLSettings* sslSettings)
     : m_client(new Client(sessionFactory, sslSettings))
-{
-}
+{}
 
 WebSocketClient::~WebSocketClient() = default;
 
