@@ -21,7 +21,10 @@ static constexpr uint16_t Test_Port = 7655;
 
 class TestClientSession final : public fishnets::WebSocketSession
 {
-    void wsOpened() override {}
+    void wsOpened() override
+    {
+        wsSend("hello");
+    }
     void wsClosed() override {}
     void wsReceivedBinary(itlib::memory_view<uint8_t>) override {}
     void wsReceivedText(itlib::memory_view<char>) override {}
@@ -76,3 +79,43 @@ TEST_CASE("failing client")
     manager.stop();
 }
 
+std::atomic_int32_t openedServerSessions = {};
+std::atomic_int32_t serverReceivedPackets = {};
+
+class TestServerSession final : public fishnets::WebSocketSession
+{
+    void wsOpened() override
+    {
+        ++openedServerSessions;
+    }
+    void wsClosed() override {}
+    void wsReceivedBinary(itlib::memory_view<uint8_t>) override {}
+    void wsReceivedText(itlib::memory_view<char> buf) override
+    {
+        ++serverReceivedPackets;
+        std::string_view str(buf.data(), buf.size());
+        CHECK(str == "hello");
+        wsClose();
+    }
+    void wsCompletedSend() override {}
+};
+
+TEST_CASE("connecting client")
+{
+    {
+        fishnets::WebSocketServer server(
+            [](const fishnets::WebSocketEndpointInfo&) { return std::make_shared<TestServerSession>(); },
+            Test_Port,
+            2,
+            testServerSSLSettings.get()
+        );
+
+        ClientConnectionManager manager;
+        manager.start();
+        while (manager.numAttempts() < 4);
+        manager.stop();
+    }
+
+    CHECK(openedServerSessions >= 3);
+    CHECK(serverReceivedPackets == openedServerSessions);
+}

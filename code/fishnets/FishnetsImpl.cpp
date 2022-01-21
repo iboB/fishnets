@@ -559,6 +559,7 @@ public:
 
     void connect(const std::string& addr, uint16_t port)
     {
+        m_ctx.restart();
         if (!initConnection(addr, port)) return;
         m_ctx.run();
     }
