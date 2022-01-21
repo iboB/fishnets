@@ -60,6 +60,7 @@ public:
         {
             m_numAttempts.fetch_add(1, std::memory_order_relaxed);
             m_client.connect("localhost", Test_Port);
+            m_client.restart();
         }
     }
 

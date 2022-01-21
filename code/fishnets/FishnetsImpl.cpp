@@ -510,10 +510,10 @@ public:
     bool initConnection(const std::string& addr, uint16_t port)
     {
         // tcp::resolver resolver{net::io_context::strand(ctx)};
-        tcp::resolver resolver{m_ctx};
+        tcp::resolver resolver(m_ctx);
 
         char portstr[6] = {};
-        std::to_chars(portstr, portstr+6, port);
+        std::to_chars(portstr, portstr + 6, port);
         auto results = resolver.resolve(tcp::v4(), addr, portstr);
         if (results.empty())
         {
@@ -559,9 +559,23 @@ public:
 
     void connect(const std::string& addr, uint16_t port)
     {
+        // prevent concurrent connections
+        if (m_hasConnection.exchange(true, std::memory_order_relaxed))
+        {
+            std::cerr << "Connection attempt on a client with an active connection\n";
+            return;
+        }
+        // make connection
+        if (initConnection(addr, port))
+        {
+            m_ctx.run();
+        }
+        m_hasConnection.store(false, std::memory_order_relaxed);
+    }
+
+    void restart()
+    {
         m_ctx.restart();
-        if (!initConnection(addr, port)) return;
-        m_ctx.run();
     }
 
     void stop()
@@ -575,6 +589,9 @@ private:
 #endif
 
     WebSocketSessionFactoryFunc m_sessionFactory;
+
+    // used to prevent concurrent connections
+    std::atomic_bool m_hasConnection = {};
 };
 
 WebSocketClient::WebSocketClient(WebSocketSessionFactoryFunc sessionFactory, WebSocketClientSSLSettings* sslSettings)
@@ -591,6 +608,11 @@ void WebSocketClient::connect(const std::string& addr, uint16_t port)
 void WebSocketClient::stop()
 {
     m_client->stop();
+}
+
+void WebSocketClient::restart()
+{
+    m_client->restart();
 }
 
 ///////////////////////////////////////////////////////////////////////////////
