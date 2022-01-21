@@ -12,7 +12,13 @@
 #include <fishnets/WebSocketServer.hpp>
 #include <fishnets/WebSocketSession.hpp>
 
+#include <atomic>
+#include <thread>
+#include <mutex>
+
 TEST_SUITE_BEGIN("fishnets");
+
+static constexpr uint16_t Test_Port = 7655;
 
 class TestClientSession final : public fishnets::WebSocketSession
 {
@@ -23,8 +29,40 @@ class TestClientSession final : public fishnets::WebSocketSession
     void wsCompletedSend() override {}
 };
 
+class ClientConnectionManager {
+public:
+    int numAttempts() const { return m_numAttempts.load(std::memory_order_relaxed); }
+
+    void start()
+    {
+        m_session = std::make_shared<TestClientSession>();
+        m_ioThread = std::thread([this]() { ioThread(); });
+    }
+
+    void stop()
+    {
+        m_ioThread.join();
+    }
+
+    void ioThread()
+    {
+        while (true)
+        {
+
+        }
+    }
+
+private:
+    std::atomic_int m_numAttempts = {};
+    std::atomic_bool m_running;
+
+    std::thread m_ioThread;
+
+    std::mutex m_sessionMutex;
+    std::shared_ptr<TestClientSession> m_session;
+};
+
 TEST_CASE("failing client")
 {
-
 }
 
