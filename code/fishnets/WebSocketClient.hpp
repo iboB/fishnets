@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 namespace fishnets
 {
@@ -28,7 +29,7 @@ public:
     // Multiple non-concurrent connections are valid as long as you restart after each one
     // Only connect if there is no other active connection with this client
     // After this function exits the client is in a stopped state
-    void connect(const std::string& addr, uint16_t port);
+    void connect(const std::string& addr, uint16_t port, std::string_view target = "/");
 
     // Stops the client: disconnects currently connected sessions and prevents future ones from connecting
     // Valid on any thread

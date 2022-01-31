@@ -359,7 +359,7 @@ public:
 
         setInitialClientOptions(m_session->getInitialOptions());
 
-        m_ws.async_handshake(m_host, "/",
+        m_ws.async_handshake(m_host, m_target,
             beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
     }
 
@@ -549,7 +549,7 @@ public:
         }
     }
 
-    bool initConnection(const std::string& addr, uint16_t port)
+    bool initConnection(const std::string& addr, uint16_t port, std::string_view target)
     {
         // tcp::resolver resolver{net::io_context::strand(ctx)};
         tcp::resolver resolver(m_ctx);
@@ -594,12 +594,13 @@ public:
         owner->m_host = addr;
         owner->m_host += ':';
         owner->m_host += portstr;
+        owner->m_target = std::string(target);
         owner->connect(results.begin()->endpoint());
 
         return true;
     }
 
-    void connect(const std::string& addr, uint16_t port)
+    void connect(const std::string& addr, uint16_t port, std::string_view target)
     {
         // prevent concurrent connections
         if (m_hasConnection.exchange(true, std::memory_order_relaxed))
@@ -608,7 +609,7 @@ public:
             return;
         }
         // make connection
-        if (initConnection(addr, port))
+        if (initConnection(addr, port, target))
         {
             m_ctx.run();
         }
@@ -642,9 +643,9 @@ WebSocketClient::WebSocketClient(WebSocketSessionFactoryFunc sessionFactory, Web
 
 WebSocketClient::~WebSocketClient() = default;
 
-void WebSocketClient::connect(const std::string& addr, uint16_t port)
+void WebSocketClient::connect(const std::string& addr, uint16_t port, std::string_view target)
 {
-    m_client->connect(addr, port);
+    m_client->connect(addr, port, target);
 }
 
 void WebSocketClient::stop()

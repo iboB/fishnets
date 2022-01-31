@@ -84,7 +84,7 @@ class TestClientSession final : public fishnets::WebSocketSession
         auto ep = wsGetEndpointInfo();
         CHECK(ep.address == "127.0.0.1");
         CHECK(ep.port == Test_Port);
-        // CHECK(wsTarget() == SessionTargetFixture::target);
+        CHECK(wsTarget() == SessionTargetFixture::target);
 
         sendNext();
     }
@@ -190,7 +190,7 @@ struct TestClient
     TestClient()
     {
         m_client.reset(new fishnets::WebSocketClient(std::bind(&TestClient::makeSession, this, std::placeholders::_1), testClientSSLSettings.get()));
-        m_client->connect("localhost", Test_Port);
+        m_client->connect("localhost", Test_Port, SessionTargetFixture::target);
     }
 
     fishnets::WebSocketSessionPtr makeSession(const fishnets::WebSocketEndpointInfo& info)
@@ -208,6 +208,18 @@ struct TestClient
 
 TEST_CASE("connect")
 {
+    fishnets::WebSocketServer server(Make_ServerSession, Test_Port, 1, testServerSSLSettings.get());
+
+    TestClient client;
+    REQUIRE(client.session);
+    CHECK(client.session->sendIndex == packets.size());
+    CHECK(client.session->receivedIndex == packets.size());
+}
+
+TEST_CASE("connect target")
+{
+    SessionTargetFixture f("/xyz");
+
     fishnets::WebSocketServer server(Make_ServerSession, Test_Port, 1, testServerSSLSettings.get());
 
     TestClient client;
