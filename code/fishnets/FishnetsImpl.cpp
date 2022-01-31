@@ -39,6 +39,7 @@
 #include <charconv>
 
 namespace net = boost::asio;
+namespace ssl = net::ssl;
 namespace beast = boost::beast;
 namespace websocket = beast::websocket;
 namespace http = beast::http;
@@ -463,17 +464,17 @@ public:
 
 #if FISHNETS_ENABLE_SSL
 
-using WSSSL = websocket::stream<net::ssl::stream<tcp::socket>>;
+using WSSSL = websocket::stream<ssl::stream<tcp::socket>>;
 class SessionOwnerSSL final : public SessionOwnerT<WSSSL>
 {
 public:
     using Super = SessionOwnerT<WSSSL>;
 
-    SessionOwnerSSL(tcp::socket&& socket, net::ssl::context& sslCtx)
+    SessionOwnerSSL(tcp::socket&& socket, ssl::context& sslCtx)
         : Super(WSSSL(std::move(socket), sslCtx))
     {}
 
-    SessionOwnerSSL(net::io_context& ctx, net::ssl::context& sslCtx)
+    SessionOwnerSSL(net::io_context& ctx, ssl::context& sslCtx)
         //: Super(WSSSL(net::io_context::strand(ctx), sslCtx))
         : Super(WSSSL(ctx, sslCtx))
     {}
@@ -486,7 +487,7 @@ public:
     // accept flow
     void accept() override
     {
-        m_ws.next_layer().async_handshake(net::ssl::stream_base::server,
+        m_ws.next_layer().async_handshake(ssl::stream_base::server,
             beast::bind_front_handler(&SessionOwnerSSL::onAcceptHandshake, shared_from_base()));
     }
 
@@ -510,7 +511,7 @@ public:
             return failed(e, "connect");
         }
 
-        m_ws.next_layer().async_handshake(net::ssl::stream_base::client,
+        m_ws.next_layer().async_handshake(ssl::stream_base::client,
             beast::bind_front_handler(&SessionOwnerSSL::onReadyForWSHandshake, shared_from_base()));
     }
 };
@@ -531,11 +532,11 @@ public:
         if (sslSettings)
         {
 #if FISHNETS_ENABLE_SSL
-            m_sslCtx.reset(new net::ssl::context(net::ssl::context::tlsv12_client));
+            m_sslCtx.reset(new ssl::context(ssl::context::tlsv12_client));
             boost::system::error_code ec;
             for (auto& cert : sslSettings->customCertificates)
             {
-                m_sslCtx->add_certificate_authority(boost::asio::buffer(cert), ec);
+                m_sslCtx->add_certificate_authority(net::buffer(cert), ec);
                 if (ec) break;
             }
             if (ec)
@@ -628,7 +629,7 @@ public:
 private:
     net::io_context m_ctx;
 #if FISHNETS_ENABLE_SSL
-    std::unique_ptr<net::ssl::context> m_sslCtx;
+    std::unique_ptr<ssl::context> m_sslCtx;
 #endif
 
     WebSocketSessionFactoryFunc m_sessionFactory;
@@ -674,11 +675,11 @@ public:
 #if FISHNETS_ENABLE_SSL
             m_sslSettings = *sslSettings;
 
-            m_sslCtx.reset(new net::ssl::context(net::ssl::context::tlsv12));
+            m_sslCtx.reset(new ssl::context(ssl::context::tlsv12));
             m_sslCtx->set_options(
-                net::ssl::context::default_workarounds |
-                net::ssl::context::no_sslv2 |
-                net::ssl::context::single_dh_use);
+                ssl::context::default_workarounds |
+                ssl::context::no_sslv2 |
+                ssl::context::single_dh_use);
 
             if (m_sslSettings.certificate.empty())
                 m_sslCtx->use_certificate_chain_file(m_sslSettings.certificateFile);
@@ -686,9 +687,9 @@ public:
                 m_sslCtx->use_certificate_chain(net::buffer(m_sslSettings.certificate));
 
             if (m_sslSettings.privateKey.empty())
-                m_sslCtx->use_private_key_file(m_sslSettings.privateKeyFile, net::ssl::context::file_format::pem);
+                m_sslCtx->use_private_key_file(m_sslSettings.privateKeyFile, ssl::context::file_format::pem);
             else
-                m_sslCtx->use_private_key(net::buffer(m_sslSettings.privateKey), net::ssl::context::file_format::pem);
+                m_sslCtx->use_private_key(net::buffer(m_sslSettings.privateKey), ssl::context::file_format::pem);
 
             if (m_sslSettings.tmpDH.empty())
                 m_sslCtx->use_tmp_dh_file(m_sslSettings.tmpDHFile);
@@ -763,7 +764,7 @@ public:
 
     net::io_context m_ctx;
 #if FISHNETS_ENABLE_SSL
-    std::unique_ptr<net::ssl::context> m_sslCtx;
+    std::unique_ptr<ssl::context> m_sslCtx;
 #endif
 
     tcp::acceptor m_acceptor;
