@@ -40,6 +40,8 @@
 
 namespace net = boost::asio;
 namespace beast = boost::beast;
+namespace websocket = beast::websocket;
+namespace http = beast::http;
 using tcp = net::ip::tcp;
 
 namespace fishnets
@@ -79,13 +81,26 @@ public:
 
     virtual void accept() = 0;
 
+    void onUpgradeRequest(beast::error_code e, size_t /*bytesTransfered*/)
+    {
+        if (e) return failed(e, "upgrade");
+        if (!websocket::is_upgrade(m_upgradeRequest)) {
+            return failed(websocket::error::no_connection_upgrade, "upgrade");
+        }
+        m_target = m_upgradeRequest.target();
+        acceptUpgrade();
+        m_readBuf.clear();
+    }
+
+    virtual void acceptUpgrade() = 0;
+
     // connect flow
 
     virtual void connect(tcp::endpoint endpoint) = 0;
 
     // connections
 
-    virtual void doClose(beast::websocket::close_code code) = 0;
+    virtual void doClose(websocket::close_code code) = 0;
 
     void onClosed(beast::error_code e)
     {
@@ -95,6 +110,11 @@ public:
     void onConnectionEstablished(beast::error_code e)
     {
         if (e) return failed(e, "establish");
+
+        // clear request to save memory
+        // it won't be needed any more
+        // (in case of clients it's already empty so this line would be redundant)
+        m_upgradeRequest = {};
 
         m_session->opened(*this);
 
@@ -106,7 +126,7 @@ public:
     virtual void doRead() = 0;
     void onRead(beast::error_code e, bool text)
     {
-        if (e == beast::websocket::error::closed) return closed();
+        if (e == websocket::error::closed) return closed();
         if (e) return failed(e, "read");
 
         auto bufData = m_readBuf.data().data();
@@ -168,8 +188,15 @@ public:
     WebSocketSessionPtr m_sessionPayload;
     WebSocketSession* m_session = nullptr; // quick access pointer
 
+    // only relevant when accepting
+    // cleared after the connection is established
+    http::request<http::string_body> m_upgradeRequest;
+
     // only relevant when connecting
     std::string m_host;
+
+    // target of web socket connection (typically "/")
+    std::string m_target;
 
     bool m_writing = false;
 };
@@ -212,7 +239,7 @@ void WebSocketSession::postWSIOTask(std::function<void()> task)
 void WebSocketSession::wsClose()
 {
     if (!m_owner) return; // already closed
-    m_owner->doClose(beast::websocket::close_code::normal);
+    m_owner->doClose(websocket::close_code::normal);
 }
 
 void WebSocketSession::wsSend(itlib::const_memory_view<uint8_t> binary)
@@ -249,6 +276,12 @@ void WebSocketSession::wsSetOptions(const WebSocketSessionOptions& options)
     m_owner->setOptions(options);
 }
 
+std::string_view WebSocketSession::wsTarget() const
+{
+    if (!m_owner) return {};
+    return m_owner->m_target;
+}
+
 namespace
 {
 
@@ -283,7 +316,7 @@ public:
         return std::static_pointer_cast<SessionOwnerT>(shared_from_this());
     }
 
-    void doClose(beast::websocket::close_code code) override final
+    void doClose(websocket::close_code code) override final
     {
         m_ws.async_close(code, beast::bind_front_handler(&SessionOwnerBase::onClosed, shared_from_this()));
     }
@@ -305,6 +338,11 @@ public:
     }
 
     // accept flow
+    void acceptUpgrade() override final
+    {
+        m_ws.async_accept(m_upgradeRequest,
+            beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
+    }
 
     // connect flow
     void connect(tcp::endpoint endpoint) override final
@@ -335,7 +373,7 @@ public:
     {
         m_ws.read_message_max(opts.maxIncomingMessageSize.value_or(16*1024*1024));
 
-        using bsb = beast::websocket::stream_base;
+        using bsb = websocket::stream_base;
         auto timeout = bsb::timeout::suggested(beast::role_type::server);
         if (opts.idleTimeout) timeout.idle_timeout = *opts.idleTimeout;
         m_ws.set_option(timeout);
@@ -343,8 +381,8 @@ public:
         auto id = opts.hostId.value_or(
             std::string("fishnets-ws-server ") + BOOST_BEAST_VERSION_STRING
         );
-        m_ws.set_option(bsb::decorator([id = std::move(id)](beast::websocket::response_type& res) {
-            res.set(beast::http::field::server, id);
+        m_ws.set_option(bsb::decorator([id = std::move(id)](websocket::response_type& res) {
+            res.set(http::field::server, id);
         }));
     }
 
@@ -352,7 +390,7 @@ public:
     {
         m_ws.read_message_max(opts.maxIncomingMessageSize.value_or(2*1024*1024));
 
-        using bsb = beast::websocket::stream_base;
+        using bsb = websocket::stream_base;
         auto timeout = bsb::timeout::suggested(beast::role_type::client);
         if (opts.idleTimeout) timeout.idle_timeout = *opts.idleTimeout;
         m_ws.set_option(timeout);
@@ -360,8 +398,8 @@ public:
         auto id = opts.hostId.value_or(
             std::string("fishnets-ws-client ") + BOOST_BEAST_VERSION_STRING
         );
-        m_ws.set_option(bsb::decorator([id = std::move(id)](beast::websocket::request_type& req) {
-            req.set(beast::http::field::user_agent, id);
+        m_ws.set_option(bsb::decorator([id = std::move(id)](websocket::request_type& req) {
+            req.set(http::field::user_agent, id);
         }));
     }
 
@@ -374,7 +412,7 @@ public:
 
         if (opts.idleTimeout)
         {
-            beast::websocket::stream_base::timeout t;
+            websocket::stream_base::timeout t;
             m_ws.get_option(t);
             t.idle_timeout = *opts.idleTimeout;
             m_ws.set_option(t);
@@ -390,7 +428,7 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 // http session owner
 
-using WSWS = beast::websocket::stream<tcp::socket>;
+using WSWS = websocket::stream<tcp::socket>;
 class SessionOwnerWS final : public SessionOwnerT<WSWS>
 {
 public:
@@ -408,7 +446,9 @@ public:
     // accept flow
     void accept() override
     {
-        m_ws.async_accept(beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
+        // read upgrade request to accept
+        http::async_read(m_ws.next_layer(), m_readBuf, m_upgradeRequest,
+            beast::bind_front_handler(&SessionOwnerBase::onUpgradeRequest, shared_from_this()));
     }
 
     // connect flow
@@ -423,7 +463,7 @@ public:
 
 #if FISHNETS_ENABLE_SSL
 
-using WSSSL = beast::websocket::stream<net::ssl::stream<tcp::socket>>;
+using WSSSL = websocket::stream<net::ssl::stream<tcp::socket>>;
 class SessionOwnerSSL final : public SessionOwnerT<WSSSL>
 {
 public:
@@ -453,7 +493,9 @@ public:
     void onAcceptHandshake(beast::error_code e)
     {
         if (e) return failed(e, "accept");
-        m_ws.async_accept(beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
+        // read upgrade request to accept
+        http::async_read(m_ws.next_layer(), m_readBuf, m_upgradeRequest,
+            beast::bind_front_handler(&SessionOwnerBase::onUpgradeRequest, shared_from_this()));
     }
 
     // connect flow

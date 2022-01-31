@@ -68,6 +68,10 @@ public:
 
     void wsSetOptions(const WebSocketSessionOptions& options);
 
+    // target of the request which initiated the session
+    // will be an empty string on sessions which are not connected
+    std::string_view wsTarget() const;
+
 protected:
     WebSocketSession();
     // intentionally not virtual. Objects are not owned through this, but instead through shared pointers

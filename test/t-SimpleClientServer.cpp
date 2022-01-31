@@ -19,6 +19,20 @@
 
 constexpr uint16_t Test_Port = 7654;
 
+struct SessionTargetFixture
+{
+    SessionTargetFixture(std::string_view t)
+    {
+        target = t;
+    }
+    ~SessionTargetFixture()
+    {
+        target = "/";
+    }
+    static std::string target;
+};
+std::string SessionTargetFixture::target  = "/";
+
 TEST_SUITE_BEGIN("fishnets");
 
 struct Packet
@@ -70,6 +84,7 @@ class TestClientSession final : public fishnets::WebSocketSession
         auto ep = wsGetEndpointInfo();
         CHECK(ep.address == "127.0.0.1");
         CHECK(ep.port == Test_Port);
+        // CHECK(wsTarget() == SessionTargetFixture::target);
 
         sendNext();
     }
@@ -116,6 +131,7 @@ class TestServerSession final : public fishnets::WebSocketSession
     {
         auto ep = wsGetEndpointInfo();
         CHECK(ep.address == "127.0.0.1");
+        CHECK(wsTarget() == SessionTargetFixture::target);
     }
 
     void wsClosed() override
