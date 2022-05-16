@@ -1,6 +1,6 @@
 include(icm_testing)
 
-CPMAddPackage(gh:iboB/doctest-lib@2.4.6)
+CPMAddPackage(gh:iboB/doctest-lib@2.4.8a)
 CPMAddPackage(gh:iboB/xec@1.3.1)
 
 add_library(TestSSLSettings STATIC TestSSLSettings.cpp)

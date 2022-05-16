@@ -96,7 +96,7 @@ class TestClientSession final : public fishnets::WebSocketSession
     void wsReceivedBinary(itlib::span<uint8_t> binary) override
     {
         REQUIRE(receivedIndex < packets.size());
-        CHECK(packets[receivedIndex] == binary);
+        CHECK((packets[receivedIndex] == binary));
         ++receivedIndex;
         closeIfDone();
     }
@@ -141,7 +141,7 @@ class TestServerSession final : public fishnets::WebSocketSession
     void wsReceivedBinary(itlib::span<uint8_t> binary) override
     {
         REQUIRE(receivedIndex < packets.size());
-        CHECK(packets[receivedIndex] == binary);
+        CHECK((packets[receivedIndex] == binary));
         sendQueue.push_back(receivedIndex);
         ++receivedIndex;
         send();
