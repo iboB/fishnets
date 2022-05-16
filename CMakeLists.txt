@@ -37,6 +37,9 @@ CPMAddPackage("gh:iboB/itlib@1.4.10#d954d7b181b78b1f83ed6c1edbde35b3c3650c7a")
 
 find_package(Threads REQUIRED)
 if(FISHNETS_SSL)
+    if (WIN32)
+        set(OPENSSL_ROOT_DIR C:/tools/OpenSSL-Win64)
+    endif()
     find_package(OpenSSL REQUIRED)
 endif()
 
