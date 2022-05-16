@@ -31,7 +31,7 @@ static constexpr size_t NUM_SESSIONS = 6;
 class Object
 {
 public:
-    Object(itlib::const_memory_view<uint8_t> data)
+    Object(itlib::span<const uint8_t> data)
         : m_data(data.begin(), data.end())
     {}
 
@@ -145,7 +145,7 @@ public:
         });
     }
 
-    void wsReceivedBinary(itlib::memory_view<uint8_t> binary) override
+    void wsReceivedBinary(itlib::span<uint8_t> binary) override
     {
         std::lock_guard l(*m_seqCheck);
         m_server.pushTask([obj = Object(binary), self = shared_from_this()]() {
@@ -175,7 +175,7 @@ public:
         });
     }
 
-    void wsReceivedText(itlib::memory_view<char>) override
+    void wsReceivedText(itlib::span<char>) override
     {
         DOCTEST_FAIL("no text!");
     }
@@ -200,7 +200,7 @@ public:
         }
         else
         {
-            wsSend(itlib::make_memory_view(m_curPacket->binary));
+            wsSend(m_curPacket->binary);
         }
         ++m_totalSends;
     }
@@ -256,7 +256,7 @@ public:
             {
                 buf.emplace_back(uint8_t(j));
             }
-            m_objects.emplace_back(itlib::make_memory_view(buf));
+            m_objects.emplace_back(buf);
         }
     }
 
@@ -275,12 +275,12 @@ public:
         CHECK(m_newObjects.size() == (NUM_SESSIONS - 1) * 5);
     }
 
-    void wsReceivedBinary(itlib::memory_view<uint8_t> binary) override
+    void wsReceivedBinary(itlib::span<uint8_t> binary) override
     {
         m_newObjects.emplace_back(binary);
     }
 
-    void wsReceivedText(itlib::memory_view<char> text) override
+    void wsReceivedText(itlib::span<char> text) override
     {
         std::string_view str(text.data(), text.size());
         if (str == "ack")
@@ -297,7 +297,7 @@ public:
 
     void sendNext()
     {
-        wsSend(itlib::make_memory_view(m_objects[m_sendIndex].data()));
+        wsSend(m_objects[m_sendIndex].data());
         ++m_sendIndex;
     }
 

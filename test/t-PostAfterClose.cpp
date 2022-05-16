@@ -22,12 +22,12 @@ class TestClientSession final : public fishnets::WebSocketSession
 
     void wsClosed() override {}
 
-    void wsReceivedBinary(itlib::memory_view<uint8_t>) override
+    void wsReceivedBinary(itlib::span<uint8_t>) override
     {
         ++receivedPackages;
     }
 
-    void wsReceivedText(itlib::memory_view<char>) override
+    void wsReceivedText(itlib::span<char>) override
     {
         ++receivedPackages;
     }
@@ -54,9 +54,9 @@ class TestServerSession final : public fishnets::WebSocketSession
         closed = true;
     }
 
-    void wsReceivedBinary(itlib::memory_view<uint8_t>) override {}
+    void wsReceivedBinary(itlib::span<uint8_t>) override {}
 
-    void wsReceivedText(itlib::memory_view<char>) override {}
+    void wsReceivedText(itlib::span<char>) override {}
 
     void wsCompletedSend() override {}
 

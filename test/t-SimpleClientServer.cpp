@@ -47,7 +47,7 @@ struct Packet
         return text == str;
     }
 
-    bool operator==(itlib::const_memory_view<uint8_t> bin) const
+    bool operator==(itlib::span<const uint8_t> bin) const
     {
         if (istext) return false;
         if (binary.size() != bin.size()) return false;
@@ -68,7 +68,7 @@ class TestClientSession final : public fishnets::WebSocketSession
     {
         auto& packet = packets[sendIndex++];
         if (packet.istext) wsSend(packet.text);
-        else wsSend(itlib::make_memory_view(packet.binary));
+        else wsSend(packet.binary);
     }
 
     void closeIfDone()
@@ -93,7 +93,7 @@ class TestClientSession final : public fishnets::WebSocketSession
     {
     }
 
-    void wsReceivedBinary(itlib::memory_view<uint8_t> binary) override
+    void wsReceivedBinary(itlib::span<uint8_t> binary) override
     {
         REQUIRE(receivedIndex < packets.size());
         CHECK(packets[receivedIndex] == binary);
@@ -101,7 +101,7 @@ class TestClientSession final : public fishnets::WebSocketSession
         closeIfDone();
     }
 
-    void wsReceivedText(itlib::memory_view<char> text) override
+    void wsReceivedText(itlib::span<char> text) override
     {
         REQUIRE(receivedIndex < packets.size());
         std::string_view str(text.data(), text.size());
@@ -138,7 +138,7 @@ class TestServerSession final : public fishnets::WebSocketSession
     {
     }
 
-    void wsReceivedBinary(itlib::memory_view<uint8_t> binary) override
+    void wsReceivedBinary(itlib::span<uint8_t> binary) override
     {
         REQUIRE(receivedIndex < packets.size());
         CHECK(packets[receivedIndex] == binary);
@@ -147,7 +147,7 @@ class TestServerSession final : public fishnets::WebSocketSession
         send();
     }
 
-    void wsReceivedText(itlib::memory_view<char> text) override
+    void wsReceivedText(itlib::span<char> text) override
     {
         REQUIRE(receivedIndex < packets.size());
         std::string_view str(text.data(), text.size());
@@ -165,7 +165,7 @@ class TestServerSession final : public fishnets::WebSocketSession
         sendQueue.pop_front();
         auto& packet = packets[*curSend];
         if (packet.istext) wsSend(packet.text);
-        else wsSend(itlib::make_memory_view(packet.binary));
+        else wsSend(packet.binary);
     }
 
     void wsCompletedSend() override

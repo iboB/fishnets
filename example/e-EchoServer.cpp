@@ -27,13 +27,13 @@ class EchoServerSession final : public fishnets::WebSocketSession
         std::cout << "Closed session " << this << '\n';
     }
 
-    void wsReceivedBinary(itlib::memory_view<uint8_t> binary) override
+    void wsReceivedBinary(itlib::span<uint8_t> binary) override
     {
         std::cout << "Received binary with size " << binary.size() << '\n';
         std::cout << "Ignoring\n";
     }
 
-    void wsReceivedText(itlib::memory_view<char> text) override
+    void wsReceivedText(itlib::span<char> text) override
     {
         std::string_view str(text.data(), text.size());
         std::cout << "Received text " << str << '\n';

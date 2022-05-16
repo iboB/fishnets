@@ -26,8 +26,8 @@ class TestClientSession final : public fishnets::WebSocketSession
         wsSend("hello");
     }
     void wsClosed() override {}
-    void wsReceivedBinary(itlib::memory_view<uint8_t>) override {}
-    void wsReceivedText(itlib::memory_view<char>) override {}
+    void wsReceivedBinary(itlib::span<uint8_t>) override {}
+    void wsReceivedText(itlib::span<char>) override {}
     void wsCompletedSend() override {}
 };
 
@@ -90,8 +90,8 @@ class TestServerSession final : public fishnets::WebSocketSession
         ++openedServerSessions;
     }
     void wsClosed() override {}
-    void wsReceivedBinary(itlib::memory_view<uint8_t>) override {}
-    void wsReceivedText(itlib::memory_view<char> buf) override
+    void wsReceivedBinary(itlib::span<uint8_t>) override {}
+    void wsReceivedText(itlib::span<char> buf) override
     {
         ++serverReceivedPackets;
         std::string_view str(buf.data(), buf.size());

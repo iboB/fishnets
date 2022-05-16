@@ -133,11 +133,11 @@ public:
         auto bufData = m_readBuf.data().data();
         if (text)
         {
-            m_session->wsReceivedText(itlib::make_memory_view(static_cast<char*>(bufData), m_readBuf.size()));
+            m_session->wsReceivedText(itlib::make_span(static_cast<char*>(bufData), m_readBuf.size()));
         }
         else
         {
-            m_session->wsReceivedBinary(itlib::make_memory_view(static_cast<uint8_t*>(bufData), m_readBuf.size()));
+            m_session->wsReceivedBinary(itlib::make_span(static_cast<uint8_t*>(bufData), m_readBuf.size()));
         }
 
         m_readBuf.clear();
@@ -243,7 +243,7 @@ void WebSocketSession::wsClose()
     m_owner->doClose(websocket::close_code::normal);
 }
 
-void WebSocketSession::wsSend(itlib::const_memory_view<uint8_t> binary)
+void WebSocketSession::wsSend(itlib::span<const uint8_t> binary)
 {
     if (!m_owner)
     {

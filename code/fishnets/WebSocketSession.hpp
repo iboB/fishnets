@@ -8,7 +8,7 @@
 #pragma once
 #include "API.h"
 
-#include <itlib/memory_view.hpp>
+#include <itlib/span.hpp>
 #include <memory>
 #include <string_view>
 #include <functional>
@@ -53,14 +53,14 @@ public:
     void wsClose();
 
     // called when data is received
-    virtual void wsReceivedBinary(itlib::memory_view<uint8_t> binary) = 0;
-    virtual void wsReceivedText(itlib::memory_view<char> text) = 0;
+    virtual void wsReceivedBinary(itlib::span<uint8_t> binary) = 0;
+    virtual void wsReceivedText(itlib::span<char> text) = 0;
 
     // call to initiate a send
     // only a single write is supported at a time
     // the lifetime of the memory viewed must be preserved until the corresponding wsCompletedSend or wsClosed is called
     // calls to send without the corresponding wsCompletedSend of the previous send being received result in undefined behavior
-    void wsSend(itlib::const_memory_view<uint8_t> binary);
+    void wsSend(itlib::span<const uint8_t> binary);
     void wsSend(std::string_view text);
     virtual void wsCompletedSend() = 0;
 
