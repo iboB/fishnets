@@ -18,10 +18,6 @@ TEST_SUITE_BEGIN("fishnets");
 
 class TestClientSession final : public fishnets::WebSocketSession
 {
-    void wsOpened() override {}
-
-    void wsClosed() override {}
-
     void wsReceivedBinary(itlib::span<uint8_t>) override
     {
         ++receivedPackages;
@@ -31,8 +27,6 @@ class TestClientSession final : public fishnets::WebSocketSession
     {
         ++receivedPackages;
     }
-
-    void wsCompletedSend() override {}
 
 public:
     int receivedPackages = 0;
@@ -53,12 +47,6 @@ class TestServerSession final : public fishnets::WebSocketSession
     {
         closed = true;
     }
-
-    void wsReceivedBinary(itlib::span<uint8_t>) override {}
-
-    void wsReceivedText(itlib::span<char>) override {}
-
-    void wsCompletedSend() override {}
 
 public:
     ~TestServerSession()

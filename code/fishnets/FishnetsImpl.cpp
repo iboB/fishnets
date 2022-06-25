@@ -268,17 +268,23 @@ void WebSocketSession::postWSIOTask(std::function<void()> task)
 {
     net::dispatch(m_ioExecutorHolder->executor,
         [self = m_ioExecutorHolder->sessionSharedFromThis.lock(), task = std::move(task)]() {
-            assert(self); // this can only fail if we're posting a taks in the session's destructor, which is definitely not a good idea
-            task();
-        }
+        assert(self); // this can only fail if we're posting a taks in the session's destructor, which is definitely not a good idea
+        task();
+    }
     );
 }
+
+void WebSocketSession::wsOpened() {}
+void WebSocketSession::wsClosed() {}
 
 void WebSocketSession::wsClose()
 {
     if (!m_owner) return; // already closed
     m_owner->doClose(websocket::close_code::normal);
 }
+
+void WebSocketSession::wsReceivedBinary(itlib::span<uint8_t>) {}
+void WebSocketSession::wsReceivedText(itlib::span<char>) {}
 
 void WebSocketSession::wsSend(itlib::span<const uint8_t> binary)
 {
@@ -301,6 +307,8 @@ void WebSocketSession::wsSend(std::string_view text)
 
     m_owner->write(true, net::buffer(text));
 }
+
+void WebSocketSession::wsCompletedSend() {}
 
 void WebSocketSession::wsHeartbeat(uint32_t) {}
 

@@ -56,8 +56,6 @@ private:
 
     void wsOpened() override; // defined below as it depends on the app
 
-    void wsClosed() override {}
-
     void wsReceivedBinary(itlib::span<uint8_t> binary) override
     {
         std::cout << "Received binary with size " << binary.size() << '\n';

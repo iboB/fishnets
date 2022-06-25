@@ -38,8 +38,6 @@ class OneshotSession final : public fishnets::WebSocketSession
         wsClose();
     }
 
-    void wsCompletedSend() override {}
-
     std::string m_sent;
 };
 

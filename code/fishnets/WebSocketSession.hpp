@@ -44,17 +44,17 @@ public:
     void postWSIOTask(std::function<void()> task);
 
     // called when socked connection is established
-    virtual void wsOpened() = 0;
+    virtual void wsOpened();
 
     // called when connection is closed
-    virtual void wsClosed() = 0;
+    virtual void wsClosed();
 
     // call to initiate the close of the session
     void wsClose();
 
     // called when data is received
-    virtual void wsReceivedBinary(itlib::span<uint8_t> binary) = 0;
-    virtual void wsReceivedText(itlib::span<char> text) = 0;
+    virtual void wsReceivedBinary(itlib::span<uint8_t> binary);
+    virtual void wsReceivedText(itlib::span<char> text);
 
     // call to initiate a send
     // only a single write is supported at a time
@@ -62,7 +62,7 @@ public:
     // calls to send without the corresponding wsCompletedSend of the previous send being received result in undefined behavior
     void wsSend(itlib::span<const uint8_t> binary);
     void wsSend(std::string_view text);
-    virtual void wsCompletedSend() = 0;
+    virtual void wsCompletedSend();
 
     // optional heartbeat function to be called periodically
     // based on the heartbeatInterval option

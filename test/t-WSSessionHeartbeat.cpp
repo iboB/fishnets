@@ -23,14 +23,11 @@ constexpr uint16_t Test_Port = 7654;
 class BasicSession : public fishnets::WebSocketSession
 {
 public:
-    void wsOpened() override {}
-    void wsClosed() override {}
     void wsReceivedBinary(itlib::span<uint8_t> binary) override
     {
         REQUIRE(binary.size() == sizeof(Packet));
         memcpy(&m_received.emplace_back(), binary.data(), sizeof(Packet));
     }
-    void wsReceivedText(itlib::span<char>) override {}
 
     void sendNext()
     {
@@ -69,8 +66,6 @@ public:
     std::optional<Packet> m_curOutPacket;
 
     std::vector<Packet> m_received;
-
-    virtual void receivedPacket(const Packet&) {}
 
     void send(Packet packet)
     {

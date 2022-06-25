@@ -25,10 +25,6 @@ class TestClientSession final : public fishnets::WebSocketSession
     {
         wsSend("hello");
     }
-    void wsClosed() override {}
-    void wsReceivedBinary(itlib::span<uint8_t>) override {}
-    void wsReceivedText(itlib::span<char>) override {}
-    void wsCompletedSend() override {}
 };
 
 class ClientConnectionManager {
@@ -89,8 +85,6 @@ class TestServerSession final : public fishnets::WebSocketSession
     {
         ++openedServerSessions;
     }
-    void wsClosed() override {}
-    void wsReceivedBinary(itlib::span<uint8_t>) override {}
     void wsReceivedText(itlib::span<char> buf) override
     {
         ++serverReceivedPackets;
@@ -98,7 +92,6 @@ class TestServerSession final : public fishnets::WebSocketSession
         CHECK(str == "hello");
         wsClose();
     }
-    void wsCompletedSend() override {}
 };
 
 TEST_CASE("connecting client")
