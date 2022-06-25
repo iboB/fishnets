@@ -29,5 +29,8 @@ struct WebSocketSessionOptions
     // note that this doesn't mean the time in which the other side hasn't communicated
     // "not respoding" is based on pings which the library does internally
     std::optional<std::chrono::milliseconds> idleTimeout;
+
+    // interval for wsHeartBeat. 0 means never
+    std::optional<std::chrono::milliseconds> heartbeatInterval;
 };
 } // namespace fishnets

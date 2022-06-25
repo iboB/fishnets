@@ -64,6 +64,14 @@ public:
     void wsSend(std::string_view text);
     virtual void wsCompletedSend() = 0;
 
+    // optional heartbeat function to be called periodically
+    // based on the heartbeatInterval option
+    // invoked in IO thread if enabled
+    // NOTE that the argument is the millisecond time provided as an option
+    // the execution may potentially be delayed due to heavy io tasks, so this is not necessarily
+    // the time since the last invocation
+    virtual void wsHeartbeat(uint32_t ms);
+
     WebSocketEndpointInfo wsGetEndpointInfo() const;
 
     void wsSetOptions(const WebSocketSessionOptions& options);

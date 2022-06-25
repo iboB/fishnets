@@ -185,9 +185,46 @@ public:
         m_session = m_sessionPayload.get();
     }
 
+    void postHeartbeatTask(std::chrono::milliseconds ms)
+    {
+        m_heartbeatTimer->expires_after(ms);
+        m_heartbeatTimer->async_wait([wself = weak_from_this(), ms](beast::error_code e) {
+            if (e) return; // error
+            auto self = wself.lock();
+            if (!self) return; // destroyed
+            self->m_session->wsHeartbeat(uint32_t(ms.count()));
+
+            if (self->m_heartbeatTimer)
+            {
+                // only post another if the timer is sitll alive
+                // wsHeartbeat may have disabled it
+                self->postHeartbeatTask(ms);
+            }
+        });
+    }
+
+    void resetHeartbeatTimer(const std::optional<std::chrono::milliseconds>& duration)
+    {
+        auto ms = duration.value_or(std::chrono::milliseconds(0));
+        if (ms.count() == 0)
+        {
+            m_heartbeatTimer.reset();
+            return;
+        }
+
+        if (!m_heartbeatTimer)
+        {
+            m_heartbeatTimer.reset(new net::steady_timer(executor()));
+        }
+
+        postHeartbeatTask(ms);
+    }
+
     beast::flat_buffer m_readBuf;
     WebSocketSessionPtr m_sessionPayload;
     WebSocketSession* m_session = nullptr; // quick access pointer
+
+    std::unique_ptr<net::steady_timer> m_heartbeatTimer;
 
     // only relevant when accepting
     // cleared after the connection is established
@@ -264,6 +301,8 @@ void WebSocketSession::wsSend(std::string_view text)
 
     m_owner->write(true, net::buffer(text));
 }
+
+void WebSocketSession::wsHeartbeat(uint32_t) {}
 
 WebSocketEndpointInfo WebSocketSession::wsGetEndpointInfo() const
 {
@@ -385,11 +424,13 @@ public:
         m_ws.set_option(bsb::decorator([id = std::move(id)](websocket::response_type& res) {
             res.set(http::field::server, id);
         }));
+
+        resetHeartbeatTimer(opts.heartbeatInterval);
     }
 
     void setInitialClientOptions(WebSocketSessionOptions opts) override final
     {
-        m_ws.read_message_max(opts.maxIncomingMessageSize.value_or(2*1024*1024));
+        m_ws.read_message_max(opts.maxIncomingMessageSize.value_or(2 * 1024 * 1024));
 
         using bsb = websocket::stream_base;
         auto timeout = bsb::timeout::suggested(beast::role_type::client);
@@ -402,10 +443,14 @@ public:
         m_ws.set_option(bsb::decorator([id = std::move(id)](websocket::request_type& req) {
             req.set(http::field::user_agent, id);
         }));
+
+        resetHeartbeatTimer(opts.heartbeatInterval);
     }
 
     void setOptions(const WebSocketSessionOptions& opts) final override
     {
+        // ignore hostId, as it's only valid when connecting
+
         if (opts.maxIncomingMessageSize)
         {
             m_ws.read_message_max(*opts.maxIncomingMessageSize);
@@ -419,7 +464,10 @@ public:
             m_ws.set_option(t);
         }
 
-        // ignore id, as it's only valid when connecting
+        if (opts.heartbeatInterval)
+        {
+            resetHeartbeatTimer(opts.heartbeatInterval);
+        }
     }
 };
 
@@ -533,7 +581,7 @@ public:
         {
 #if FISHNETS_ENABLE_SSL
             m_sslCtx.reset(new ssl::context(ssl::context::tlsv12_client));
-            boost::system::error_code ec;
+            beast::error_code ec;
             for (auto& cert : sslSettings->customCertificates)
             {
                 m_sslCtx->add_certificate_authority(net::buffer(cert), ec);
