@@ -14,7 +14,8 @@
 #include <fishnets/WebSocketSessionOptions.hpp>
 
 #include <mutex>
-
+#include <thread>
+#include <cstring>
 #include <queue>
 
 constexpr uint16_t Test_Port = 7654;
