@@ -137,9 +137,15 @@ public:
         }
     }
 
-    static void test(const std::vector<Packet>&)
+    static void test(const std::vector<Packet>& r)
     {
-
+        REQUIRE(r.size() == 6);
+        for (uint32_t i = 1; i < 6; ++i)
+        {
+            auto& p = r[i];
+            CHECK(p.type == Packet::Type::Heartbeat);
+            CHECK(p.payload == i);
+        }
     }
 };
 
@@ -178,9 +184,86 @@ public:
         }
     }
 
-    static void test(const std::vector<Packet>&)
+    static void test(const std::vector<Packet>& r)
     {
+        REQUIRE(r.size() == 6);
+        for (uint32_t i = 1; i < 6; ++i)
+        {
+            auto& p = r[i];
+            CHECK(p.type == Packet::Type::Heartbeat);
+            CHECK(p.payload == i);
+        }
+    }
+};
 
+class RestartSender : public SimpleSender
+{
+public:
+    DECL_SENDER();
+
+    uint32_t m_beats = 0;
+
+    void wsOpened() override
+    {
+        send({Packet::Type::Id, id});
+
+        fishnets::WebSocketSessionOptions opts;
+        opts.heartbeatInterval = std::chrono::milliseconds(50);
+        wsSetOptions(opts);
+    }
+
+    void wsHeartbeat(uint32_t ms) override
+    {
+        ++m_beats;
+        CHECK(m_beats < 7);
+
+        if (ms == 50)
+        {
+            send({Packet::Type::Heartbeat, m_beats * 10});
+            if (m_beats == 3)
+            {
+                fishnets::WebSocketSessionOptions opts;
+                opts.heartbeatInterval = std::chrono::milliseconds(0);
+                wsSetOptions(opts);
+            }
+        }
+        else
+        {
+            CHECK(ms == 150);
+            send({Packet::Type::Heartbeat, m_beats * 100});
+            if (m_beats == 6)
+            {
+                send({Packet::Type::Done, 0});
+            }
+        }
+    }
+
+    void wsCompletedSend() override
+    {
+        if (m_outQueue.empty() && m_beats == 3)
+        {
+            fishnets::WebSocketSessionOptions opts;
+            opts.heartbeatInterval = std::chrono::milliseconds(150);
+            wsSetOptions(opts);
+        }
+        BasicSession::wsCompletedSend();
+    }
+
+    static void test(const std::vector<Packet>& r)
+    {
+        REQUIRE(r.size() == 7);
+        for (uint32_t i = 1; i < 4; ++i)
+        {
+            auto& p = r[i];
+            CHECK(p.type == Packet::Type::Heartbeat);
+            CHECK(p.payload == i * 10);
+        }
+        for (uint32_t i = 4; i < 6; ++i)
+        {
+            auto& p = r[i];
+            CHECK(p.type == Packet::Type::Heartbeat);
+            CHECK(p.payload == i * 100);
+        }
     }
 };
 
@@ -240,6 +323,7 @@ fishnets::WebSocketSessionPtr Make_ReceiverSession(const fishnets::WebSocketEndp
 
 DEF_SENDER(SimpleSender);
 DEF_SENDER(ManualHBSender);
+DEF_SENDER(RestartSender);
 
 TEST_CASE("Client heartbeat")
 {
