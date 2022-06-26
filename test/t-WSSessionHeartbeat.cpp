@@ -17,6 +17,7 @@
 #include <thread>
 #include <cstring>
 #include <queue>
+#include <atomic>
 
 constexpr uint16_t Test_Port = 7654;
 
@@ -252,6 +253,33 @@ TEST_CASE("Client heartbeat")
         {
             clients.emplace_back([&]() {
                 fishnets::WebSocketClient client(ts.make, testClientSSLSettings.get());
+                client.connect("localhost", Test_Port);
+            });
+        }
+        for (auto& c : clients)
+        {
+            c.join();
+        }
+    }
+}
+
+TEST_CASE("Server heartbeat")
+{
+    CaseResultChecker checker;
+
+    {
+        std::atomic_size_t c = {};
+        fishnets::WebSocketServer server([&c](const fishnets::WebSocketEndpointInfo& info) {
+            auto i = c.fetch_add(1);
+            REQUIRE(i < BasicSession::senderRegistry.size());
+            return BasicSession::senderRegistry[i].make(info);
+        }, Test_Port, 2, testServerSSLSettings.get());
+
+        std::vector<std::thread> clients;
+        for (size_t i=0; i<BasicSession::senderRegistry.size(); ++i)
+        {
+            clients.emplace_back([&]() {
+                fishnets::WebSocketClient client(Make_ReceiverSession, testClientSSLSettings.get());
                 client.connect("localhost", Test_Port);
             });
         }
