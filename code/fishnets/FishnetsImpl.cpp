@@ -268,9 +268,9 @@ void WebSocketSession::postWSIOTask(std::function<void()> task)
 {
     net::dispatch(m_ioExecutorHolder->executor,
         [self = m_ioExecutorHolder->sessionSharedFromThis.lock(), task = std::move(task)]() {
-        assert(self); // this can only fail if we're posting a taks in the session's destructor, which is definitely not a good idea
-        task();
-    }
+            assert(self); // this can only fail if we're posting a taks in the session's destructor, which is definitely not a good idea
+            task();
+        }
     );
 }
 
