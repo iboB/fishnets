@@ -15,7 +15,7 @@ namespace fishnets
 struct WebSocketEndpointInfo
 {
     std::string address;
-    uint16_t port;
+    uint16_t port = 0;
 };
 
 } // namespace fishnets

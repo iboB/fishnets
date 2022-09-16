@@ -334,9 +334,12 @@ namespace
 {
 
 template <typename Socket>
-WebSocketEndpointInfo getEndpointInfoOf(const Socket& s)
+std::optional<WebSocketEndpointInfo> getEndpointInfoOf(const Socket& s)
 {
-    auto ep = beast::get_lowest_layer(s).remote_endpoint();
+    beast::error_code err;
+    auto ep = beast::get_lowest_layer(s).remote_endpoint(err);
+    // if there's an error, the socket has likely been disconnected
+    if (err) return {};
 
     WebSocketEndpointInfo ret;
     ret.address = ep.address().to_string();
@@ -414,7 +417,8 @@ public:
     // util
     WebSocketEndpointInfo getEndpointInfo() override final
     {
-        return getEndpointInfoOf(m_ws);
+        // if we end-up requesting tje enpoint info on a disconnected socket just return a default value
+        return getEndpointInfoOf(m_ws).value_or(WebSocketEndpointInfo{});
     }
 
     void setInitialServerOptions(WebSocketSessionOptions opts) override final
@@ -787,7 +791,13 @@ public:
         }
 
         // init session and owner
-        auto session = m_sessionFactory(getEndpointInfoOf(socket));
+        auto ep = getEndpointInfoOf(socket);
+        if (!ep)
+        {
+            std::cerr << "socket disconnected while accepting\n";
+            return;
+        }
+        auto session = m_sessionFactory(*ep);
         if (!session)
         {
             std::cout << "session declined\n";
