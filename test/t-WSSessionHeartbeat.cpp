@@ -24,7 +24,7 @@ constexpr uint16_t Test_Port = 7654;
 class BasicSession : public fishnets::WebSocketSession
 {
 public:
-    void wsReceivedBinary(itlib::span<uint8_t> binary) override
+    void wsReceivedBinary(itlib::span<uint8_t> binary) final override
     {
         REQUIRE(binary.size() == sizeof(Packet));
         memcpy(&m_received.emplace_back(), binary.data(), sizeof(Packet));
@@ -103,7 +103,18 @@ std::vector<BasicSession::SenderEntry> BasicSession::senderRegistry;
     } \
     const uint32_t T::id = BasicSession::registerSender<T>()
 
-class SimpleSender : public BasicSession
+class BasicSender : public BasicSession
+{
+public:
+    fishnets::WebSocketSessionOptions getInitialOptions() final override
+    {
+        fishnets::WebSocketSessionOptions ret;
+        ret.heartbeatInterval = std::chrono::milliseconds(100);
+        return ret;
+    }
+};
+
+class SimpleSender final : public BasicSender
 {
 public:
     DECL_SENDER();
@@ -113,13 +124,6 @@ public:
     void wsOpened() override
     {
         send({Packet::Type::Id, id});
-    }
-
-    fishnets::WebSocketSessionOptions getInitialOptions() override
-    {
-        fishnets::WebSocketSessionOptions ret;
-        ret.heartbeatInterval = std::chrono::milliseconds(100);
-        return ret;
     }
 
     void wsHeartbeat(uint32_t ms) override
@@ -149,7 +153,7 @@ public:
     }
 };
 
-class ManualHBSender : public SimpleSender
+class ManualHBSender final : public BasicSender
 {
 public:
     DECL_SENDER();
@@ -196,7 +200,7 @@ public:
     }
 };
 
-class RestartSender : public SimpleSender
+class RestartSender final : public BasicSender
 {
 public:
     DECL_SENDER();
@@ -271,7 +275,7 @@ static std::mutex g_resultMutex;
 using CaseResultVec = std::vector<std::vector<BasicSession::Packet>>;
 CaseResultVec* g_caseResult;
 
-struct ReceiverSession : public BasicSession
+struct ReceiverSession final : public BasicSession
 {
     ~ReceiverSession()
     {
