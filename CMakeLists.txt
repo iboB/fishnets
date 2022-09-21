@@ -49,6 +49,9 @@ if(ICM_DEV_MODE)
     CPMAddPackage(gh:iboB/boost-trim@1.79.0)
     add_library(boost-beast INTERFACE)
     target_link_libraries(boost-beast INTERFACE Boost::boost)
+
+    # only add scratch project in dev mode
+    add_subdirectory(scratch)
 endif()
 
 #######################################
