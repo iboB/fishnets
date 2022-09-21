@@ -218,20 +218,20 @@ public:
 
     void ack() override
     {
-        postWSIOTask([self = shared_from_this()]() {
-            self->sendPacketIOThread(Packet{true, "ack", {}});
+        postWSIOTask([this]() {
+            sendPacketIOThread(Packet{true, "ack", {}});
         });
     }
     void bye() override
     {
-        postWSIOTask([self = shared_from_this()]() {
-            self->sendPacketIOThread(Packet{true, "done", {}});
+        postWSIOTask([this]() {
+            sendPacketIOThread(Packet{true, "done", {}});
         });
     }
     void sendObj(const Object& object) override
     {
-        postWSIOTask([p = Packet{false, "done", object.data()}, self = shared_from_this()]() mutable {
-            self->sendPacketIOThread(std::move(p));
+        postWSIOTask([this, p = Packet{false, "done", object.data()}]() mutable {
+            sendPacketIOThread(std::move(p));
         });
     }
 
