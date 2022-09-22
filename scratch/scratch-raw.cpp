@@ -54,7 +54,7 @@ private:
 };
 
 class Server;
-class SessionOwnerBase;
+class SessionOwner;
 class ExecutorHolder;
 
 class WebSocketSession : public std::enable_shared_from_this<WebSocketSession>
@@ -84,14 +84,14 @@ public:
 
 private:
     friend class Server;
-    friend class SessionOwnerBase;
+    friend class SessionOwner;
 
-    SessionOwnerBase* m_owner = nullptr;
+    SessionOwner* m_owner = nullptr;
 
     // used for posting IO tasks
     std::unique_ptr<ExecutorHolder> m_ioExecutorHolder;
 
-    void opened(SessionOwnerBase& session);
+    void opened(SessionOwner& session);
     void closed();
 };
 
@@ -108,19 +108,29 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 // session
 
-class SessionOwnerBase : public std::enable_shared_from_this<SessionOwnerBase>
+class SessionOwner : public std::enable_shared_from_this<SessionOwner>
 {
 public:
-    ~SessionOwnerBase()
+    websocket::stream<tcp::socket> m_ws;
+
+    SessionOwner(tcp::socket&& socket)
+        : m_ws(std::move(socket))
+    {}
+
+    ~SessionOwner()
     {
         m_session->closed();
     }
 
-    virtual net::executor executor() = 0;
-
     // accept flow
 
-    virtual void accept() = 0;
+    void accept()
+    {
+        // read upgrade request to accept
+        http::async_read(m_ws.next_layer(), m_readBuf, m_upgradeRequest,
+            beast::bind_front_handler(&SessionOwner::onUpgradeRequest, shared_from_this()));
+    }
+
 
     void onUpgradeRequest(beast::error_code e, size_t /*bytesTransfered*/)
     {
@@ -129,15 +139,17 @@ public:
             return failed(websocket::error::no_connection_upgrade, "upgrade");
         }
         m_target = m_upgradeRequest.target();
-        acceptUpgrade();
+        m_ws.async_accept(m_upgradeRequest,
+            beast::bind_front_handler(&SessionOwner::onConnectionEstablished, shared_from_this()));
         m_readBuf.clear();
     }
 
-    virtual void acceptUpgrade() = 0;
-
     // connections
 
-    virtual void doClose(websocket::close_code code) = 0;
+    void doClose(websocket::close_code code)
+    {
+        m_ws.async_close(code, beast::bind_front_handler(&SessionOwner::onClosed, shared_from_this()));
+    }
 
     void onClosed(beast::error_code e)
     {
@@ -160,7 +172,16 @@ public:
 
     // io
 
-    virtual void doRead() = 0;
+    void onReadCB(beast::error_code e, size_t)
+    {
+        onRead(e, m_ws.got_text());
+    }
+
+    void doRead()
+    {
+        m_ws.async_read(m_readBuf, beast::bind_front_handler(&SessionOwner::onReadCB, shared_from_this()));
+    }
+
     void onRead(beast::error_code e, bool text)
     {
         if (e == websocket::error::closed) return closed();
@@ -187,7 +208,11 @@ public:
         doWrite(text, buf);
     }
 
-    virtual void doWrite(bool text, net::const_buffer buf) = 0;
+    void doWrite(bool text, net::const_buffer buf)
+    {
+        m_ws.text(text);
+        m_ws.async_write(buf, beast::bind_front_handler(&SessionOwner::onWrite, shared_from_this()));
+    }
 
     void onWrite(beast::error_code e, size_t)
     {
@@ -198,7 +223,19 @@ public:
 
     // util
 
-    virtual void setInitialServerOptions() = 0;
+    void setInitialServerOptions()
+    {
+        m_ws.read_message_max(16 * 1024 * 1024);
+
+        using bsb = websocket::stream_base;
+        auto timeout = bsb::timeout::suggested(beast::role_type::server);
+        m_ws.set_option(timeout);
+
+        auto id = std::string("ws-server ") + BOOST_BEAST_VERSION_STRING;
+        m_ws.set_option(bsb::decorator([id = std::move(id)](websocket::response_type& res) {
+            res.set(http::field::server, id);
+        }));
+    }
 
     void failed(beast::error_code e, const char* source)
     {
@@ -240,7 +277,7 @@ WebSocketSession::WebSocketSession() = default;
 
 WebSocketSession::~WebSocketSession() = default;
 
-void WebSocketSession::opened(SessionOwnerBase& session)
+void WebSocketSession::opened(SessionOwner& session)
 {
     assert(!m_owner);
     m_owner = &session;
@@ -305,105 +342,6 @@ std::string_view WebSocketSession::wsTarget() const
     return m_owner->m_target;
 }
 
-namespace
-{
-
-template <typename WS>
-class SessionOwnerT : public SessionOwnerBase
-{
-public:
-    SessionOwnerT(WS ws)
-        : m_ws(std::move(ws))
-    {}
-
-    WS m_ws;
-
-    net::executor executor() override final
-    {
-        return m_ws.get_executor();
-    }
-
-    std::shared_ptr<SessionOwnerT> shared_from_base()
-    {
-        return std::static_pointer_cast<SessionOwnerT>(shared_from_this());
-    }
-
-    void doClose(websocket::close_code code) override final
-    {
-        m_ws.async_close(code, beast::bind_front_handler(&SessionOwnerBase::onClosed, shared_from_this()));
-    }
-
-    void onReadCB(beast::error_code e, size_t)
-    {
-        onRead(e, m_ws.got_text());
-    }
-
-    void doRead() override final
-    {
-        m_ws.async_read(m_readBuf, beast::bind_front_handler(&SessionOwnerT::onReadCB, shared_from_base()));
-    }
-
-    void doWrite(bool text, net::const_buffer buf) override final
-    {
-        m_ws.text(text);
-        m_ws.async_write(buf, beast::bind_front_handler(&SessionOwnerBase::onWrite, shared_from_this()));
-    }
-
-    // accept flow
-    void acceptUpgrade() override final
-    {
-        m_ws.async_accept(m_upgradeRequest,
-            beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
-    }
-
-    // util
-    void setInitialServerOptions() override final
-    {
-        m_ws.read_message_max(16 * 1024 * 1024);
-
-        using bsb = websocket::stream_base;
-        auto timeout = bsb::timeout::suggested(beast::role_type::server);
-        m_ws.set_option(timeout);
-
-        auto id = std::string("ws-server ") + BOOST_BEAST_VERSION_STRING;
-        m_ws.set_option(bsb::decorator([id = std::move(id)](websocket::response_type& res) {
-            res.set(http::field::server, id);
-        }));
-    }
-};
-
-///////////////////////////////////////////////////////////////////////////////
-// session owners
-
-///////////////////////////////////////////////////////////////////////////////
-// http session owner
-
-using WSWS = websocket::stream<tcp::socket>;
-class SessionOwnerWS final : public SessionOwnerT<WSWS>
-{
-public:
-    using Super = SessionOwnerT<WSWS>;
-
-    SessionOwnerWS(tcp::socket&& socket)
-        : Super(WSWS(std::move(socket)))
-    {}
-
-    SessionOwnerWS(net::io_context& ctx)
-        //: Super(WSWS(net::io_context::strand(ctx)))
-        : Super(WSWS(ctx))
-    {}
-
-    // accept flow
-    void accept() override
-    {
-        // read upgrade request to accept
-        http::async_read(m_ws.next_layer(), m_readBuf, m_upgradeRequest,
-            beast::bind_front_handler(&SessionOwnerBase::onUpgradeRequest, shared_from_this()));
-    }
-};
-
-} // anonymous namespace
-
 ///////////////////////////////////////////////////////////////////////////////
 // server
 
@@ -447,10 +385,9 @@ public:
         // init session and owner
         auto session = std::make_shared<WebSocketSession>();
 
-        std::shared_ptr<SessionOwnerBase> owner;
-        owner = std::make_shared<SessionOwnerWS>(std::move(socket));
+        auto owner = std::make_shared<SessionOwner>(std::move(socket));
         owner->setInitialServerOptions();
-        session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(owner->executor());
+        session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(owner->m_ws.get_executor());
         owner->setSession(std::move(session));
 
         // and initiate
