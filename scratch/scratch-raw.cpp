@@ -18,183 +18,26 @@
 #include <iostream>
 #include <thread>
 
-#include <itlib/span.hpp>
-#include <memory>
-#include <string_view>
-#include <functional>
-#include <optional>
-#include <vector>
-
 namespace net = boost::asio;
+namespace ssl = net::ssl;
 namespace beast = boost::beast;
 namespace websocket = beast::websocket;
 namespace http = beast::http;
 using tcp = net::ip::tcp;
 
-class WebSocketSession;
-using WebSocketSessionPtr = std::shared_ptr<WebSocketSession>;
-
-class WebSocketServer;
-class SessionOwner;
-
-class WebSocketSession : public std::enable_shared_from_this<WebSocketSession>
+class session : public std::enable_shared_from_this<session>
 {
-public:
-    WebSocketSession();
-    ~WebSocketSession();
-
-    WebSocketSession(const WebSocketSession&) = delete;
-    WebSocketSession& operator=(const WebSocketSession&) = delete;
-    WebSocketSession(WebSocketSession&&) noexcept = delete;
-    WebSocketSession& operator=(WebSocketSession&&) noexcept = delete;
-
-    virtual void wsOpened();
-    virtual void wsClosed();
-    void wsClose();
-
-    virtual void wsReceivedBinary(itlib::span<uint8_t> binary);
-    virtual void wsReceivedText(itlib::span<char> text);
-
-    void wsSend(itlib::span<const uint8_t> binary);
-    void wsSend(std::string_view text);
-    virtual void wsCompletedSend();
-
-    std::string_view wsTarget() const;
-
-private:
-    friend class WebSocketServer;
-    friend class SessionOwner;
-
-    SessionOwner* m_owner = nullptr;
-
-    void opened(SessionOwner& session);
-    void closed();
-};
-
-///////////////////////////////////////////////////////////////////////////////
-// session
-
-class SessionOwner : public std::enable_shared_from_this<SessionOwner>
-{
-public:
     websocket::stream<tcp::socket> m_ws;
+    net::executor m_executor;
 
-    SessionOwner(tcp::socket&& socket)
-        : m_ws(std::move(socket))
+    beast::flat_buffer m_read_buf;
+    http::request<http::string_body> m_upgrade_req;
+    std::string m_target;
+public:
+    session(tcp::socket&& s)
+        : m_ws(std::move(s))
+        , m_executor(m_ws.get_executor())
     {}
-
-    ~SessionOwner()
-    {
-        m_session->closed();
-    }
-
-    // accept flow
-
-    void accept()
-    {
-        // read upgrade request to accept
-        http::async_read(m_ws.next_layer(), m_readBuf, m_upgradeRequest,
-            beast::bind_front_handler(&SessionOwner::onUpgradeRequest, shared_from_this()));
-    }
-
-
-    void onUpgradeRequest(beast::error_code e, size_t /*bytesTransfered*/)
-    {
-        if (e) return failed(e, "upgrade");
-        if (!websocket::is_upgrade(m_upgradeRequest)) {
-            return failed(websocket::error::no_connection_upgrade, "upgrade");
-        }
-        m_target = m_upgradeRequest.target();
-        m_ws.async_accept(m_upgradeRequest,
-            beast::bind_front_handler(&SessionOwner::onConnectionEstablished, shared_from_this()));
-        m_readBuf.clear();
-    }
-
-    // connections
-
-    void doClose(websocket::close_code code)
-    {
-        m_ws.async_close(code, beast::bind_front_handler(&SessionOwner::onClosed, shared_from_this()));
-    }
-
-    void onClosed(beast::error_code e)
-    {
-        if (e) return failed(e, "close");
-    }
-
-    void onConnectionEstablished(beast::error_code e)
-    {
-        if (e) return failed(e, "establish");
-
-        // clear request to save memory
-        // it won't be needed any more
-        // (in case of clients it's already empty so this line would be redundant)
-        m_upgradeRequest = {};
-
-        m_session->opened(*this);
-
-        doRead();
-    }
-
-    // io
-
-    void onReadCB(beast::error_code e, size_t)
-    {
-        onRead(e, m_ws.got_text());
-    }
-
-    void doRead()
-    {
-        m_ws.async_read(m_readBuf, beast::bind_front_handler(&SessionOwner::onReadCB, shared_from_this()));
-    }
-
-    void onRead(beast::error_code e, bool text)
-    {
-        if (e == websocket::error::closed) return closed();
-        if (e) return failed(e, "read");
-
-        auto bufData = m_readBuf.data().data();
-        if (text)
-        {
-            m_session->wsReceivedText(itlib::make_span(static_cast<char*>(bufData), m_readBuf.size()));
-        }
-        else
-        {
-            m_session->wsReceivedBinary(itlib::make_span(static_cast<uint8_t*>(bufData), m_readBuf.size()));
-        }
-
-        m_readBuf.clear();
-        doRead();
-    }
-
-    void write(bool text, net::const_buffer buf)
-    {
-        assert(!m_writing);
-        m_writing = true;
-        doWrite(text, buf);
-    }
-
-    void doWrite(bool text, net::const_buffer buf)
-    {
-        m_ws.text(text);
-        m_ws.async_write(buf, beast::bind_front_handler(&SessionOwner::onWrite, shared_from_this()));
-    }
-
-    void onWrite(beast::error_code e, size_t)
-    {
-        if (e) return failed(e, "write");
-        m_writing = false;
-        m_session->wsCompletedSend();
-    }
-
-    // util
-
-    void setInitialServerOptions()
-    {
-        using bsb = websocket::stream_base;
-        auto timeout = bsb::timeout::suggested(beast::role_type::server);
-        m_ws.set_option(timeout);
-    }
 
     void failed(beast::error_code e, const char* source)
     {
@@ -206,124 +49,100 @@ public:
         std::cout << "session closed\n";
     }
 
-    void setSession(WebSocketSessionPtr&& session)
+    void on_close(beast::error_code e)
     {
-        m_sessionPayload = std::move(session);
-        m_session = m_sessionPayload.get();
+        if (e) return failed(e, "close");
     }
 
-    beast::flat_buffer m_readBuf;
-    WebSocketSessionPtr m_sessionPayload;
-    WebSocketSession* m_session = nullptr; // quick access pointer
+    void do_close()
+    {
+        m_ws.async_close(websocket::close_code::normal, beast::bind_front_handler(&session::on_close, shared_from_this()));
+    }
 
-    // only relevant when accepting
-    // cleared after the connection is established
-    http::request<http::string_body> m_upgradeRequest;
+    void on_read(beast::error_code e, size_t)
+    {
+        if (e == websocket::error::closed) return closed();
+        if (e) return failed(e, "read");
 
-    // only relevant when connecting
-    std::string m_host;
+        if (m_ws.got_text())
+        {
+            std::string_view str(static_cast<char*>(m_read_buf.data().data()), m_read_buf.size());
+            std::cout << "received: " << str << std::endl; // flush intentionally
+        }
 
-    // target of web socket connection (typically "/")
-    std::string m_target;
+        m_read_buf.clear();
+        do_read();
+    }
 
-    bool m_writing = false;
+    void do_read()
+    {
+        m_ws.async_read(m_read_buf, beast::bind_front_handler(&session::on_read, shared_from_this()));
+    }
+
+    void on_connected(beast::error_code e)
+    {
+        if (e) return failed(e, "establish");
+
+        m_upgrade_req = {}; // clear request to save memory
+
+        do_read();
+    }
+
+    void on_upgrade_request(beast::error_code e, size_t /*bytesTransfered*/)
+    {
+        if (e) return failed(e, "upgrade");
+        if (!websocket::is_upgrade(m_upgrade_req)) return failed(websocket::error::no_connection_upgrade, "upgrade");
+        m_target = m_upgrade_req.target();
+        m_ws.async_accept(m_upgrade_req,
+            beast::bind_front_handler(&session::on_connected, shared_from_this()));
+        m_read_buf.clear();
+    }
+
+    void set_server_options()
+    {
+        auto timeout = websocket::stream_base::timeout::suggested(beast::role_type::server);
+        m_ws.set_option(timeout);
+    }
+
+    void accept()
+    {
+        http::async_read(m_ws.next_layer(), m_read_buf, m_upgrade_req,
+            beast::bind_front_handler(&session::on_upgrade_request, shared_from_this()));
+    }
 };
 
-///////////////////////////////////////////////////////////////////////////////
-// WebSocketSession
-
-WebSocketSession::WebSocketSession() = default;
-
-WebSocketSession::~WebSocketSession() = default;
-
-void WebSocketSession::opened(SessionOwner& session)
+class server
 {
-    assert(!m_owner);
-    m_owner = &session;
-    wsOpened();
-}
-
-void WebSocketSession::closed()
-{
-    m_owner = nullptr;
-    wsClosed();
-}
-
-void WebSocketSession::wsOpened() {}
-void WebSocketSession::wsClosed() {}
-
-void WebSocketSession::wsClose()
-{
-    if (!m_owner) return; // already closed
-    m_owner->doClose(websocket::close_code::normal);
-}
-
-void WebSocketSession::wsReceivedBinary(itlib::span<uint8_t>) {}
-void WebSocketSession::wsReceivedText(itlib::span<char>) {}
-
-void WebSocketSession::wsSend(itlib::span<const uint8_t> binary)
-{
-    if (!m_owner)
-    {
-        std::cerr << "Ignore write on closed session\n";
-        return;
-    }
-
-    m_owner->write(false, net::buffer(binary.data(), binary.size()));
-}
-
-void WebSocketSession::wsSend(std::string_view text)
-{
-    if (!m_owner)
-    {
-        std::cerr << "Ignore write on closed session\n";
-        return;
-    }
-
-    m_owner->write(true, net::buffer(text));
-}
-
-void WebSocketSession::wsCompletedSend() {}
-
-std::string_view WebSocketSession::wsTarget() const
-{
-    if (!m_owner) return {};
-    return m_owner->m_target;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// server
-
-class WebSocketServer
-{
+    net::io_context m_ctx;
+    tcp::acceptor m_acceptor;
+    std::vector<std::thread> m_threads;
 public:
-    WebSocketServer(uint16_t port, int numThreads)
-        : m_ctx(numThreads)
-        , m_acceptor(m_ctx, tcp::endpoint(tcp::v4(), port))
+    server(int nthreads)
+        : m_ctx(nthreads)
+        , m_acceptor(m_ctx, tcp::endpoint(tcp::v4(), 7654))
     {
-        doAccept();
-        m_threads.reserve(size_t(numThreads));
-        for (int i = 0; i < numThreads; ++i)
+        do_accept();
+        for (int i = 0; i < nthreads; ++i)
         {
             m_threads.emplace_back([this]() { m_ctx.run(); });
         }
+
     }
 
-    ~WebSocketServer()
+    ~server()
     {
         m_ctx.stop();
-        for (auto& thread : m_threads)
-        {
-            thread.join();
+        for (auto& t : m_threads) {
+            t.join();
         }
     }
 
-    void doAccept()
+    void do_accept()
     {
-        m_acceptor.async_accept(net::make_strand(m_ctx), beast::bind_front_handler(&WebSocketServer::onAccept, this));
+        m_acceptor.async_accept(net::make_strand(m_ctx), beast::bind_front_handler(&server::on_accept, this));
     }
 
-    void onAccept(beast::error_code e, tcp::socket socket)
+    void on_accept(beast::error_code e, tcp::socket socket)
     {
         if (e)
         {
@@ -331,25 +150,13 @@ public:
             return;
         }
 
-        // init session and owner
-        auto session = std::make_shared<WebSocketSession>();
-
-        auto owner = std::make_shared<SessionOwner>(std::move(socket));
-        owner->setInitialServerOptions();
-        owner->setSession(std::move(session));
-
-        // and initiate
-        owner->accept();
+        auto s = std::make_shared<session>(std::move(socket));
+        s->set_server_options(); // OFFENDER
+        s->accept();
 
         // accept more sessions
-        doAccept();
+        do_accept();
     }
-
-    net::io_context m_ctx;
-
-    tcp::acceptor m_acceptor;
-
-    std::vector<std::thread> m_threads;
 };
 
 void client(const std::string msg, const int num, const int ms)
@@ -380,7 +187,7 @@ void client(const std::string msg, const int num, const int ms)
 
 int main()
 {
-    WebSocketServer server(7654, 2);
+    server s(2);
     //while (true) std::this_thread::yield;
 
     std::vector<std::thread> clients;
