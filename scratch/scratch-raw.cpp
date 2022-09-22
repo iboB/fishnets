@@ -48,7 +48,6 @@ public:
     WebSocketSession(WebSocketSession&&) noexcept = delete;
     WebSocketSession& operator=(WebSocketSession&&) noexcept = delete;
 
-    void postWSIOTask(std::function<void()> task);
     virtual void wsOpened();
     virtual void wsClosed();
     void wsClose();
@@ -67,9 +66,6 @@ private:
     friend class SessionOwner;
 
     SessionOwner* m_owner = nullptr;
-
-    // used for posting IO tasks
-    net::executor m_executor;
 
     void opened(SessionOwner& session);
     void closed();
@@ -195,16 +191,9 @@ public:
 
     void setInitialServerOptions()
     {
-        m_ws.read_message_max(16 * 1024 * 1024);
-
         using bsb = websocket::stream_base;
         auto timeout = bsb::timeout::suggested(beast::role_type::server);
         m_ws.set_option(timeout);
-
-        auto id = std::string("ws-server ") + BOOST_BEAST_VERSION_STRING;
-        m_ws.set_option(bsb::decorator([id = std::move(id)](websocket::response_type& res) {
-            res.set(http::field::server, id);
-        }));
     }
 
     void failed(beast::error_code e, const char* source)
@@ -258,16 +247,6 @@ void WebSocketSession::closed()
 {
     m_owner = nullptr;
     wsClosed();
-}
-
-void WebSocketSession::postWSIOTask(std::function<void()> task)
-{
-    net::dispatch(m_executor,
-        [self = shared_from_this(), task = std::move(task)]() {
-            assert(self); // this can only fail if we're posting a taks in the session's destructor, which is definitely not a good idea
-            task();
-        }
-    );
 }
 
 void WebSocketSession::wsOpened() {}
@@ -357,7 +336,6 @@ public:
 
         auto owner = std::make_shared<SessionOwner>(std::move(socket));
         owner->setInitialServerOptions();
-        //session->m_executor = owner->m_ws.get_executor();
         owner->setSession(std::move(session));
 
         // and initiate
