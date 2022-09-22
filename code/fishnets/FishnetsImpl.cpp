@@ -15,7 +15,6 @@
 #include "WebSocketEndpointInfo.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
-#define BOOST_ASIO_USE_TS_EXECUTOR_AS_DEFAULT 1
 
 #if defined(_MSC_VER)
 #   pragma warning (disable: 4100)
@@ -51,12 +50,12 @@ namespace fishnets
 class ExecutorHolder
 {
 public:
-    ExecutorHolder(net::executor&& ex, const WebSocketSessionPtr& session)
+    ExecutorHolder(net::any_io_executor&& ex, const WebSocketSessionPtr& session)
         : executor(std::move(ex))
         , sessionSharedFromThis(session)
     {}
 
-    net::executor executor;
+    net::any_io_executor executor;
 
     // a poor man's shared-from this implementation, to avoid actually inheriting std::enable_shared_from_this in sessions
     // and leave that (optional) inheritance to the user
@@ -76,7 +75,7 @@ public:
         m_session->closed();
     }
 
-    virtual net::executor executor() = 0;
+    virtual net::any_io_executor executor() = 0;
 
     // accept flow
 
@@ -357,7 +356,7 @@ public:
 
     WS m_ws;
 
-    net::executor executor() override final
+    net::any_io_executor executor() override final
     {
         return m_ws.get_executor();
     }
