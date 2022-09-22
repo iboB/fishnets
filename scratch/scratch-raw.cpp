@@ -34,28 +34,8 @@ using tcp = net::ip::tcp;
 class WebSocketSession;
 using WebSocketSessionPtr = std::shared_ptr<WebSocketSession>;
 
-class Server;
-
-class WebSocketServer
-{
-public:
-    WebSocketServer(
-        uint16_t port,
-        int numThreads = 1);
-    ~WebSocketServer();
-
-    WebSocketServer(const WebSocketServer&) = delete;
-    WebSocketServer& operator=(const WebSocketServer&) = delete;
-    WebSocketServer(WebSocketServer&&) noexcept = delete;
-    WebSocketServer& operator=(WebSocketServer&&) noexcept = delete;
-
-private:
-    std::unique_ptr<Server> m_server;
-};
-
-class Server;
+class WebSocketServer;
 class SessionOwner;
-class ExecutorHolder;
 
 class WebSocketSession : public std::enable_shared_from_this<WebSocketSession>
 {
@@ -83,26 +63,16 @@ public:
     std::string_view wsTarget() const;
 
 private:
-    friend class Server;
+    friend class WebSocketServer;
     friend class SessionOwner;
 
     SessionOwner* m_owner = nullptr;
 
     // used for posting IO tasks
-    std::unique_ptr<ExecutorHolder> m_ioExecutorHolder;
+    net::executor m_executor;
 
     void opened(SessionOwner& session);
     void closed();
-};
-
-class ExecutorHolder
-{
-public:
-    ExecutorHolder(net::executor&& ex)
-        : executor(std::move(ex))
-    {}
-
-    net::executor executor;
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -292,7 +262,7 @@ void WebSocketSession::closed()
 
 void WebSocketSession::postWSIOTask(std::function<void()> task)
 {
-    net::dispatch(m_ioExecutorHolder->executor,
+    net::dispatch(m_executor,
         [self = shared_from_this(), task = std::move(task)]() {
             assert(self); // this can only fail if we're posting a taks in the session's destructor, which is definitely not a good idea
             task();
@@ -345,12 +315,12 @@ std::string_view WebSocketSession::wsTarget() const
 ///////////////////////////////////////////////////////////////////////////////
 // server
 
-class Server
+class WebSocketServer
 {
 public:
-    Server(tcp::endpoint endpoint, int numThreads)
+    WebSocketServer(uint16_t port, int numThreads)
         : m_ctx(numThreads)
-        , m_acceptor(m_ctx, endpoint)
+        , m_acceptor(m_ctx, tcp::endpoint(tcp::v4(), port))
     {
         doAccept();
         m_threads.reserve(size_t(numThreads));
@@ -360,7 +330,7 @@ public:
         }
     }
 
-    ~Server()
+    ~WebSocketServer()
     {
         m_ctx.stop();
         for (auto& thread : m_threads)
@@ -371,7 +341,7 @@ public:
 
     void doAccept()
     {
-        m_acceptor.async_accept(net::make_strand(m_ctx), beast::bind_front_handler(&Server::onAccept, this));
+        m_acceptor.async_accept(net::make_strand(m_ctx), beast::bind_front_handler(&WebSocketServer::onAccept, this));
     }
 
     void onAccept(beast::error_code e, tcp::socket socket)
@@ -387,7 +357,7 @@ public:
 
         auto owner = std::make_shared<SessionOwner>(std::move(socket));
         owner->setInitialServerOptions();
-        session->m_ioExecutorHolder = std::make_unique<ExecutorHolder>(owner->m_ws.get_executor());
+        //session->m_executor = owner->m_ws.get_executor();
         owner->setSession(std::move(session));
 
         // and initiate
@@ -403,14 +373,6 @@ public:
 
     std::vector<std::thread> m_threads;
 };
-
-WebSocketServer::WebSocketServer(uint16_t port, int numThreads)
-{
-    auto const address = tcp::v4();
-    m_server.reset(new Server(tcp::endpoint(address, port), numThreads));
-}
-
-WebSocketServer::~WebSocketServer() = default;
 
 void client(const std::string msg, const int num, const int ms)
 {
