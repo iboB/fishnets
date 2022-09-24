@@ -1,3 +1,6 @@
+# Copyright (c) Borislav Stanimirov
+# SPDX-License-Identifier: MIT
+#
 include(icm_testing)
 
 CPMAddPackage(gh:iboB/doctest-lib@2.4.8a)

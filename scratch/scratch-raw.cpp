@@ -1,9 +1,5 @@
-// fishnets
-// Copyright (c) 2021-2022 Borislav Stanimirov
-//
-// Distributed under the MIT Software License
-// See accompanying file LICENSE or copy at
-// https://opensource.org/licenses/MIT
+// Copyright (c) Borislav Stanimirov
+// SPDX-License-Identifier: MIT
 //
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
 #define BOOST_ASIO_USE_TS_EXECUTOR_AS_DEFAULT 1
