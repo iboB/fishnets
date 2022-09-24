@@ -10,7 +10,7 @@ include(./get_cpm.cmake)
 
 #######################################
 # cmake lib
-CPMAddPackage(gh:iboB/icm@1.3.3)
+CPMAddPackage(gh:iboB/icm@1.3.4)
 
 set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
@@ -35,8 +35,8 @@ endif()
 
 #######################################
 # packages
-CPMAddPackage(gh:iboB/splat@1.2.0)
-CPMAddPackage(gh:iboB/itlib@1.5.0)
+CPMAddPackage(gh:iboB/splat@1.2.1)
+CPMAddPackage(gh:iboB/itlib@1.6.3)
 
 find_package(Threads REQUIRED)
 if(FISHNETS_SSL)
@@ -50,8 +50,7 @@ if(ICM_DEV_MODE)
     # only add boost in dev mode
     # otherwise rely on the external project providing it
     CPMAddPackage(gh:iboB/boost-trim@1.79.0)
-    add_library(boost-beast INTERFACE)
-    target_link_libraries(boost-beast INTERFACE Boost::boost)
+    add_library(Boost::beast ALIAS Boost::boost)
 
     # only add scratch project in dev mode
     add_subdirectory(scratch)

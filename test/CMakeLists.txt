@@ -3,18 +3,18 @@
 #
 include(icm_testing)
 
-CPMAddPackage(gh:iboB/doctest-lib@2.4.8a)
-CPMAddPackage(gh:iboB/xec@1.3.1)
+CPMAddPackage(gh:iboB/doctest-util@0.0.5)
+CPMAddPackage(gh:iboB/xec@1.4.1)
 
-add_library(TestSSLSettings STATIC TestSSLSettings.cpp)
-target_link_libraries(TestSSLSettings PUBLIC fishnets)
-add_library(TestNullSSLSettings STATIC TestNullSSLSettings.cpp)
-target_link_libraries(TestNullSSLSettings PUBLIC fishnets)
+add_library(fishnets-TestSSLSettings STATIC TestSSLSettings.cpp)
+target_link_libraries(fishnets-TestSSLSettings PUBLIC fishnets)
+add_library(fishnets-TestNullSSLSettings STATIC TestNullSSLSettings.cpp)
+target_link_libraries(fishnets-TestNullSSLSettings PUBLIC fishnets)
 
 macro(fishnets_dual_test test)
-    icm_add_doctest_lib_test(${test}-ws fishnets ${ARGN} LIBRARIES xec TestNullSSLSettings)
+    add_doctest_lib_test(${test}-ws fishnets ${ARGN} LIBRARIES xec::xec fishnets-TestNullSSLSettings)
     if(FISHNETS_SSL)
-        icm_add_doctest_lib_test(${test}-ssl fishnets ${ARGN} LIBRARIES xec TestSSLSettings)
+        add_doctest_lib_test(${test}-ssl fishnets ${ARGN} LIBRARIES xec::xec fishnets-TestSSLSettings)
     endif()
 endmacro()
 

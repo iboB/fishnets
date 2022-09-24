@@ -4,16 +4,17 @@
 icm_add_lib(fishnets FISHNETS
     FishnetsImpl.cpp
 )
+add_library(fishnets::fishnets ALIAS fishnets)
 
 icm_bigobj(FishnetsImpl.cpp)
 
 target_link_libraries(fishnets
     PRIVATE
-        boost-beast
+        Boost::beast
         ${CMAKE_THREAD_LIBS_INIT}
     PUBLIC
-        splat
-        itlib
+        splat::splat
+        itlib::itlib
 )
 
 if(FISHNETS_SSL)

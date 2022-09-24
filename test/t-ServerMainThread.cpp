@@ -305,7 +305,7 @@ public:
 
 TEST_CASE("server client threads")
 {
-    xec::ThreadExecutionContext executionContext;
+    auto executionContext = std::make_shared<xec::ThreadExecutionContext>();
     Server server;
     server.setExecutionContext(executionContext);
 
@@ -328,9 +328,9 @@ TEST_CASE("server client threads")
     }
 
     server.setFinishTasksOnExit(true);
-    while (executionContext.running())
+    while (executionContext->running())
     {
-        executionContext.wait();
+        executionContext->wait();
         server.update();
     }
     server.finalize();

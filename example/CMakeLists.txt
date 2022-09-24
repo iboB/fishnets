@@ -3,9 +3,9 @@ macro(fishnets_example example)
     target_link_libraries(${example} fishnets)
 endmacro()
 
-CPMAddPackage(gh:iboB/xec@1.3.1)
+CPMAddPackage(gh:iboB/xec@1.4.1)
 
 fishnets_example(echo-server e-EchoServer.cpp)
 fishnets_example(oneshot-client e-OneshotClient.cpp)
 fishnets_example(terminal-client e-TerminalClient.cpp)
-target_link_libraries(terminal-client xec)
+target_link_libraries(terminal-client xec::xec)
