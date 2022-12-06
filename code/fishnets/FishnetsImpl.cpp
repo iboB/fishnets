@@ -27,6 +27,8 @@
 #include <boost/beast/ssl.hpp>
 #endif
 
+#include <itlib/shared_from.hpp>
+
 #include <iostream>
 #include <cassert>
 #include <vector>
@@ -63,7 +65,7 @@ public:
 ///////////////////////////////////////////////////////////////////////////////
 // session
 
-class SessionOwnerBase : public std::enable_shared_from_this<SessionOwnerBase>
+class SessionOwnerBase : public itlib::enable_shared_from
 {
 public:
     ~SessionOwnerBase()
@@ -183,7 +185,7 @@ public:
     void postHeartbeatTask(std::chrono::milliseconds ms)
     {
         m_heartbeatTimer->expires_after(ms);
-        m_heartbeatTimer->async_wait([wself = weak_from_this(), ms](beast::error_code e) {
+        m_heartbeatTimer->async_wait([wself = weak_from(this), ms](beast::error_code e) {
             if (e) return; // error
             auto self = wself.lock();
             if (!self) return; // destroyed
@@ -357,14 +359,9 @@ public:
         return m_ws.get_executor();
     }
 
-    std::shared_ptr<SessionOwnerT> shared_from_base()
-    {
-        return std::static_pointer_cast<SessionOwnerT>(shared_from_this());
-    }
-
     void doClose(websocket::close_code code) override final
     {
-        m_ws.async_close(code, beast::bind_front_handler(&SessionOwnerBase::onClosed, shared_from_this()));
+        m_ws.async_close(code, beast::bind_front_handler(&SessionOwnerBase::onClosed, shared_from(this)));
     }
 
     void onReadCB(beast::error_code e, size_t)
@@ -374,27 +371,27 @@ public:
 
     void doRead() override final
     {
-        m_ws.async_read(m_readBuf, beast::bind_front_handler(&SessionOwnerT::onReadCB, shared_from_base()));
+        m_ws.async_read(m_readBuf, beast::bind_front_handler(&SessionOwnerT::onReadCB, shared_from(this)));
     }
 
     void doWrite(bool text, net::const_buffer buf) override final
     {
         m_ws.text(text);
-        m_ws.async_write(buf, beast::bind_front_handler(&SessionOwnerBase::onWrite, shared_from_this()));
+        m_ws.async_write(buf, beast::bind_front_handler(&SessionOwnerBase::onWrite, shared_from(this)));
     }
 
     // accept flow
     void acceptUpgrade() override final
     {
         m_ws.async_accept(m_upgradeRequest,
-            beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
+            beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from(this)));
     }
 
     // connect flow
     void connect(tcp::endpoint endpoint) override final
     {
          beast::get_lowest_layer(m_ws).async_connect(endpoint,
-            beast::bind_front_handler(&SessionOwnerT::onConnectCB, shared_from_base()));
+            beast::bind_front_handler(&SessionOwnerT::onConnectCB, shared_from(this)));
     }
 
     virtual void onConnectCB(beast::error_code e) = 0;
@@ -406,7 +403,7 @@ public:
         setInitialClientOptions(m_session->getInitialOptions());
 
         m_ws.async_handshake(m_host, m_target,
-            beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from_this()));
+            beast::bind_front_handler(&SessionOwnerBase::onConnectionEstablished, shared_from(this)));
     }
 
     // util
@@ -504,7 +501,7 @@ public:
     {
         // read upgrade request to accept
         http::async_read(m_ws.next_layer(), m_readBuf, m_upgradeRequest,
-            beast::bind_front_handler(&SessionOwnerBase::onUpgradeRequest, shared_from_this()));
+            beast::bind_front_handler(&SessionOwnerBase::onUpgradeRequest, shared_from(this)));
     }
 
     // connect flow
@@ -534,16 +531,11 @@ public:
         : Super(WSSSL(ctx, sslCtx))
     {}
 
-    std::shared_ptr<SessionOwnerSSL> shared_from_base()
-    {
-        return std::static_pointer_cast<SessionOwnerSSL>(shared_from_this());
-    }
-
     // accept flow
     void accept() override
     {
         m_ws.next_layer().async_handshake(ssl::stream_base::server,
-            beast::bind_front_handler(&SessionOwnerSSL::onAcceptHandshake, shared_from_base()));
+            beast::bind_front_handler(&SessionOwnerSSL::onAcceptHandshake, shared_from(this)));
     }
 
     void onAcceptHandshake(beast::error_code e)
@@ -551,7 +543,7 @@ public:
         if (e) return failed(e, "accept");
         // read upgrade request to accept
         http::async_read(m_ws.next_layer(), m_readBuf, m_upgradeRequest,
-            beast::bind_front_handler(&SessionOwnerBase::onUpgradeRequest, shared_from_this()));
+            beast::bind_front_handler(&SessionOwnerBase::onUpgradeRequest, shared_from(this)));
     }
 
     // connect flow
@@ -567,7 +559,7 @@ public:
         }
 
         m_ws.next_layer().async_handshake(ssl::stream_base::client,
-            beast::bind_front_handler(&SessionOwnerSSL::onReadyForWSHandshake, shared_from_base()));
+            beast::bind_front_handler(&SessionOwnerSSL::onReadyForWSHandshake, shared_from(this)));
     }
 };
 
