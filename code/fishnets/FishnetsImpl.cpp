@@ -377,7 +377,7 @@ public:
     void doWrite(bool text, net::const_buffer buf) override final
     {
         m_ws.text(text);
-        m_ws.async_write(buf, beast::bind_front_handler(&SessionOwnerBase::onWrite, shared_from(this)));
+        m_ws.async_write_some(true, buf, beast::bind_front_handler(&SessionOwnerBase::onWrite, shared_from(this)));
     }
 
     // accept flow
