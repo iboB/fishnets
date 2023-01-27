@@ -56,8 +56,11 @@ public:
     // only a single write is supported at a time
     // the lifetime of the memory viewed must be preserved until the corresponding wsCompletedSend or wsClosed is called
     // calls to send without the corresponding wsCompletedSend of the previous send being received result in undefined behavior
-    void wsSend(itlib::span<const uint8_t> binary);
-    void wsSend(std::string_view text);
+    // with complete = false, a partial packet can be sent
+    // sending heterogeneous (text-binary) partial packets is not supported
+    // the first packet in a chain determines the type
+    void wsSend(itlib::span<const uint8_t> binary, bool complete = true);
+    void wsSend(std::string_view text, bool complete = true);
     virtual void wsCompletedSend();
 
     // optional heartbeat function to be called periodically

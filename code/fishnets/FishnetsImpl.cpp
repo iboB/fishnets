@@ -141,14 +141,14 @@ public:
         doRead();
     }
 
-    void write(bool text, net::const_buffer buf)
+    void write(bool text, bool complete, net::const_buffer buf)
     {
         assert(!m_writing);
         m_writing = true;
-        doWrite(text, buf);
+        doWrite(text, complete, buf);
     }
 
-    virtual void doWrite(bool text, net::const_buffer buf) = 0;
+    virtual void doWrite(bool text, bool complete, net::const_buffer buf) = 0;
 
     void onWrite(beast::error_code e, size_t)
     {
@@ -283,7 +283,7 @@ void WebSocketSession::wsClose()
 void WebSocketSession::wsReceivedBinary(itlib::span<uint8_t>) {}
 void WebSocketSession::wsReceivedText(itlib::span<char>) {}
 
-void WebSocketSession::wsSend(itlib::span<const uint8_t> binary)
+void WebSocketSession::wsSend(itlib::span<const uint8_t> binary, bool complete)
 {
     if (!m_owner)
     {
@@ -291,10 +291,10 @@ void WebSocketSession::wsSend(itlib::span<const uint8_t> binary)
         return;
     }
 
-    m_owner->write(false, net::buffer(binary.data(), binary.size()));
+    m_owner->write(false, complete, net::buffer(binary.data(), binary.size()));
 }
 
-void WebSocketSession::wsSend(std::string_view text)
+void WebSocketSession::wsSend(std::string_view text, bool complete)
 {
     if (!m_owner)
     {
@@ -302,7 +302,7 @@ void WebSocketSession::wsSend(std::string_view text)
         return;
     }
 
-    m_owner->write(true, net::buffer(text));
+    m_owner->write(true, complete, net::buffer(text));
 }
 
 void WebSocketSession::wsCompletedSend() {}
@@ -374,10 +374,10 @@ public:
         m_ws.async_read(m_readBuf, beast::bind_front_handler(&SessionOwnerT::onReadCB, shared_from(this)));
     }
 
-    void doWrite(bool text, net::const_buffer buf) override final
+    void doWrite(bool text, bool complete, net::const_buffer buf) override final
     {
         m_ws.text(text);
-        m_ws.async_write_some(true, buf, beast::bind_front_handler(&SessionOwnerBase::onWrite, shared_from(this)));
+        m_ws.async_write_some(complete, buf, beast::bind_front_handler(&SessionOwnerBase::onWrite, shared_from(this)));
     }
 
     // accept flow
