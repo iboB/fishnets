@@ -35,8 +35,8 @@ endif()
 
 #######################################
 # packages
-CPMAddPackage(gh:iboB/splat@1.2.1)
-CPMAddPackage(gh:iboB/itlib@1.7.0)
+CPMAddPackage(gh:iboB/splat@1.2.2)
+CPMAddPackage(gh:iboB/itlib@1.8.2)
 
 find_package(Threads REQUIRED)
 if(FISHNETS_SSL)
