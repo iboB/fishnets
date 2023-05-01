@@ -349,9 +349,9 @@ TEST_CASE("Server heartbeat")
     CaseResultChecker checker;
 
     {
-        std::atomic_size_t c = {};
-        fishnets::WebSocketServer server([&c](const fishnets::WebSocketEndpointInfo& info) {
-            auto i = c.fetch_add(1);
+        std::atomic_size_t cnt = {};
+        fishnets::WebSocketServer server([&cnt](const fishnets::WebSocketEndpointInfo& info) {
+            auto i = cnt.fetch_add(1);
             REQUIRE(i < BasicSender::senderRegistry.size());
             return BasicSender::senderRegistry[i].make(info);
         }, Test_Port, 2, testServerSSLSettings.get());

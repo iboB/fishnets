@@ -305,9 +305,10 @@ public:
 
 TEST_CASE("server client threads")
 {
-    auto executionContext = std::make_shared<xec::ThreadExecutionContext>();
     Server server;
-    server.setExecutionContext(executionContext);
+    auto sctx = std::make_unique<xec::ThreadExecutionContext>();
+    auto executionContext = sctx.get();
+    server.setExecutionContext(std::move(sctx));
 
     static constexpr uint16_t port = 7654;
     std::atomic_int32_t freeServerSessionId = {};

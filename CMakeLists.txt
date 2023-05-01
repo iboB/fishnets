@@ -1,7 +1,7 @@
 # Copyright (c) Borislav Stanimirov
 # SPDX-License-Identifier: MIT
 #
-cmake_minimum_required(VERSION 3.14 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 
 project(fishnets)
 
@@ -10,7 +10,7 @@ include(./get_cpm.cmake)
 
 #######################################
 # cmake lib
-CPMAddPackage(gh:iboB/icm@1.3.4)
+CPMAddPackage(gh:iboB/icm@1.4.5)
 
 set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
@@ -35,8 +35,8 @@ endif()
 
 #######################################
 # packages
-CPMAddPackage(gh:iboB/splat@1.2.2)
-CPMAddPackage(gh:iboB/itlib@1.8.2)
+CPMAddPackage(gh:iboB/splat@1.3.1)
+CPMAddPackage(gh:iboB/itlib@1.9.2)
 
 find_package(Threads REQUIRED)
 if(FISHNETS_SSL)
