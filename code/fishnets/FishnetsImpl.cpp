@@ -178,8 +178,7 @@ public:
 
     void setSession(WebSocketSessionPtr&& session)
     {
-        m_sessionPayload = std::move(session);
-        m_session = m_sessionPayload.get();
+        m_session = std::move(session);
     }
 
     void postHeartbeatTask(std::chrono::milliseconds ms)
@@ -218,8 +217,7 @@ public:
     }
 
     beast::flat_buffer m_readBuf;
-    WebSocketSessionPtr m_sessionPayload;
-    WebSocketSession* m_session = nullptr; // quick access pointer
+    WebSocketSessionPtr m_session;
 
     std::unique_ptr<net::steady_timer> m_heartbeatTimer;
 
