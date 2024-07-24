@@ -49,7 +49,7 @@ endif()
 if(ICM_DEV_MODE)
     # only add boost in dev mode
     # otherwise rely on the external project providing it
-    CPMAddPackage(gh:iboB/boost-trim@1.79.0)
+    CPMAddPackage(gh:iboB/boost-trim@1.85.0)
     add_library(Boost::beast ALIAS Boost::boost)
 
     # only add scratch project in dev mode
