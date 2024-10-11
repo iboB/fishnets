@@ -40,20 +40,13 @@ CPMAddPackage(gh:iboB/itlib@1.9.2)
 
 find_package(Threads REQUIRED)
 if(FISHNETS_SSL)
-    if (WIN32)
-        set(OPENSSL_ROOT_DIR C:/tools/OpenSSL-Win64)
-    endif()
     find_package(OpenSSL REQUIRED)
 endif()
 
-if(ICM_DEV_MODE)
-    # only add boost in dev mode
-    # otherwise rely on the external project providing it
+if(NOT TARGET Boost::boost)
+    # only add boost if not added from the outside
     CPMAddPackage(gh:iboB/boost-trim@1.85.0)
     add_library(Boost::beast ALIAS Boost::boost)
-
-    # only add scratch project in dev mode
-    add_subdirectory(scratch)
 endif()
 
 #######################################
@@ -68,4 +61,9 @@ endif()
 
 if(FISHNETS_BUILD_EXAMPLES)
     add_subdirectory(example)
+endif()
+
+if(ICM_DEV_MODE)
+    # only add scratch project in dev mode
+    add_subdirectory(scratch)
 endif()
