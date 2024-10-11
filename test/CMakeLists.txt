@@ -3,8 +3,8 @@
 #
 include(icm_testing)
 
-CPMAddPackage(gh:iboB/doctest-util@0.1.1)
-CPMAddPackage("gh:iboB/xec@1.4.1a#8df4932be976f45413c6c8d3806bfeb55e0020f9")
+CPMAddPackage(gh:iboB/doctest-util@0.1.2)
+CPMAddPackage(gh:iboB/xec@1.5.2)
 
 add_library(fishnets-TestSSLSettings STATIC TestSSLSettings.cpp)
 target_link_libraries(fishnets-TestSSLSettings PUBLIC fishnets)

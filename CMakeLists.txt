@@ -10,7 +10,7 @@ include(./get_cpm.cmake)
 
 #######################################
 # cmake lib
-CPMAddPackage(gh:iboB/icm@1.4.5)
+CPMAddPackage(gh:iboB/icm@1.5.1)
 
 set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
@@ -35,8 +35,8 @@ endif()
 
 #######################################
 # packages
-CPMAddPackage(gh:iboB/splat@1.3.1)
-CPMAddPackage(gh:iboB/itlib@1.9.2)
+CPMAddPackage(gh:iboB/splat@1.3.3)
+CPMAddPackage(gh:iboB/itlib@1.11.4)
 
 find_package(Threads REQUIRED)
 if(FISHNETS_SSL)
@@ -46,6 +46,10 @@ endif()
 if(NOT TARGET Boost::boost)
     # only add boost if not added from the outside
     CPMAddPackage(gh:iboB/boost-trim@1.85.0)
+endif()
+
+if(NOT TARGET Boost::beast)
+    # beast is header only, so this is fine
     add_library(Boost::beast ALIAS Boost::boost)
 endif()
 

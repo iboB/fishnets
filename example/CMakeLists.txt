@@ -3,7 +3,7 @@ macro(fishnets_example example)
     target_link_libraries(${example} fishnets)
 endmacro()
 
-CPMAddPackage(gh:iboB/xec@1.4.1)
+CPMAddPackage(gh:iboB/xec@1.5.2)
 
 fishnets_example(echo-server e-EchoServer.cpp)
 fishnets_example(oneshot-client e-OneshotClient.cpp)
