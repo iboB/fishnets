@@ -13,7 +13,7 @@ target_link_libraries(fishnets-TestNullSSLSettings PUBLIC fishnets)
 
 macro(fishnets_dual_test test)
     add_doctest_lib_test(${test}-ws fishnets ${ARGN} LIBRARIES xec::xec fishnets-TestNullSSLSettings)
-    if(FISHNETS_SSL)
+    if(fishnetsHaveSsl)
         add_doctest_lib_test(${test}-ssl fishnets ${ARGN} LIBRARIES xec::xec fishnets-TestSSLSettings)
     endif()
 endmacro()

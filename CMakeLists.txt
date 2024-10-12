@@ -10,7 +10,7 @@ include(./get_cpm.cmake)
 
 #######################################
 # cmake lib
-CPMAddPackage(gh:iboB/icm@1.5.1)
+CPMAddPackage(gh:iboB/icm@1.5.2)
 
 set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
@@ -20,6 +20,7 @@ set(CMAKE_MODULE_PATH
 include(icm_dev_mode)
 include(icm_add_lib)
 include(icm_bigobj)
+include(icm_option)
 
 #######################################
 # options
@@ -27,7 +28,7 @@ include(icm_bigobj)
 option(FISHNETS_STATIC "fishnets: build as static lib" OFF)
 option(FISHNETS_BUILD_TESTS "fishnets: build tests" ${ICM_DEV_MODE})
 option(FISHNETS_BUILD_EXAMPLES "fishnets: build examples" ${ICM_DEV_MODE})
-option(FISHNETS_SSL "fisnets: add ssl and secure websocket support" ON)
+icm_auto_option(FISHNETS_SSL "fisnets: add ssl and secure websocket support" AUTO)
 
 if(ICM_DEV_MODE)
     mark_as_advanced(FISHNETS_BUILD_TESTS FISHNETS_BUILD_EXAMPLES)
@@ -39,8 +40,10 @@ CPMAddPackage(gh:iboB/splat@1.3.3)
 CPMAddPackage(gh:iboB/itlib@1.11.4)
 
 find_package(Threads REQUIRED)
+set(fishnetsHaveSsl FALSE)
 if(FISHNETS_SSL)
-    find_package(OpenSSL REQUIRED)
+    find_package(OpenSSL ${FISHNETS_SSL_REQUIRED})
+    set(fishnetsHaveSsl TRUE)
 endif()
 
 if(NOT TARGET Boost::boost)

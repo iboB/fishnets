@@ -17,7 +17,7 @@ target_link_libraries(fishnets
         itlib::itlib
 )
 
-if(FISHNETS_SSL)
+if(fishnetsHaveSsl)
     target_link_libraries(fishnets PRIVATE
         OpenSSL::SSL
         OpenSSL::Crypto
