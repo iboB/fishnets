@@ -12,6 +12,7 @@
 #include <xec/TaskExecutor.hpp>
 
 #include <list>
+#include <algorithm>
 
 TEST_SUITE_BEGIN("fishnets");
 

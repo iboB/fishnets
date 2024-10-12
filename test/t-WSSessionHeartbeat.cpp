@@ -14,6 +14,7 @@
 #include <cstring>
 #include <queue>
 #include <atomic>
+#include <algorithm>
 
 constexpr uint16_t Test_Port = 7654;
 
