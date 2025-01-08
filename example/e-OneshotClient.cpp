@@ -9,11 +9,12 @@
 
 class OneshotSession final : public fishnets::WebSocketSession
 {
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         std::cout << "Connected\n";
         m_sent = "cool message";
         wsSend(m_sent);
+        return {};
     }
 
     void wsClosed() override
@@ -21,17 +22,19 @@ class OneshotSession final : public fishnets::WebSocketSession
         std::cout << "Disconnected\n";
     }
 
-    void wsReceivedBinary(itlib::span<uint8_t> binary) override
+    itlib::span<uint8_t> wsReceivedBinary(itlib::span<uint8_t> binary, bool) override
     {
         std::cout << "Received binary with size " << binary.size() << '\n';
         wsClose();
+        return {};
     }
 
-    void wsReceivedText(itlib::span<char> text) override
+    itlib::span<uint8_t> wsReceivedText(itlib::span<char> text, bool) override
     {
         std::string_view str(text.data(), text.size());
         std::cout << "Received text " << str << '\n';
         wsClose();
+        return {};
     }
 
     std::string m_sent;

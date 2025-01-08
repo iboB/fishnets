@@ -110,7 +110,7 @@ public:
         ++destroyedServerSessions;
     }
 
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         std::lock_guard l(*m_seqCheck);
 
@@ -123,6 +123,8 @@ public:
                 self->sendObj(obj);
             }
         });
+
+        return {};
     }
 
     void wsClosed() override
@@ -142,8 +144,9 @@ public:
         });
     }
 
-    void wsReceivedBinary(itlib::span<uint8_t> binary) override
+    itlib::span<uint8_t> wsReceivedBinary(itlib::span<uint8_t> binary, bool complete) override
     {
+        CHECK(complete);
         std::lock_guard l(*m_seqCheck);
         m_server.pushTask([obj = Object(binary), self = shared_from_this()]() {
             auto& server = self->m_server;
@@ -170,11 +173,14 @@ public:
                 server.byesSent = true;
             }
         });
+
+        return {};
     }
 
-    void wsReceivedText(itlib::span<char>) override
+    itlib::span<uint8_t> wsReceivedText(itlib::span<char>, bool) override
     {
         DOCTEST_FAIL("no text!");
+        return {};
     }
 
     void wsCompletedSend() override
@@ -262,9 +268,10 @@ public:
         ++destroyedClientSessions;
     }
 
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         sendNext();
+        return {};
     }
 
     void wsClosed() override
@@ -272,18 +279,22 @@ public:
         CHECK(m_newObjects.size() == (NUM_SESSIONS - 1) * 5);
     }
 
-    void wsReceivedBinary(itlib::span<uint8_t> binary) override
+    itlib::span<uint8_t> wsReceivedBinary(itlib::span<uint8_t> binary, bool complete) override
     {
+        CHECK(complete);
         m_newObjects.emplace_back(binary);
+        return {};
     }
 
-    void wsReceivedText(itlib::span<char> text) override
+    itlib::span<uint8_t> wsReceivedText(itlib::span<char> text, bool complete) override
     {
+        CHECK(complete);
         std::string_view str(text.data(), text.size());
         if (str == "ack")
             ++acks;
         else if (str == "done")
             wsClose();
+        return {};
     }
 
     void wsCompletedSend() override

@@ -75,7 +75,7 @@ class TestClientSession final : public fishnets::WebSocketSession
         }
     }
 
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         auto ep = wsGetEndpointInfo();
         CHECK(ep.address == "127.0.0.1");
@@ -83,27 +83,32 @@ class TestClientSession final : public fishnets::WebSocketSession
         CHECK(wsTarget() == SessionTargetFixture::target);
 
         sendNext();
+        return {};
     }
 
     void wsClosed() override
     {
     }
 
-    void wsReceivedBinary(itlib::span<uint8_t> binary) override
+    itlib::span<uint8_t> wsReceivedBinary(itlib::span<uint8_t> binary, bool complete) override
     {
         REQUIRE(receivedIndex < packets.size());
+        CHECK(complete);
         CHECK((packets[receivedIndex] == binary));
         ++receivedIndex;
         closeIfDone();
+        return {};
     }
 
-    void wsReceivedText(itlib::span<char> text) override
+    itlib::span<uint8_t> wsReceivedText(itlib::span<char> text, bool complete) override
     {
         REQUIRE(receivedIndex < packets.size());
+        CHECK(complete);
         std::string_view str(text.data(), text.size());
         CHECK(packets[receivedIndex] == str);
         ++receivedIndex;
         closeIfDone();
+        return {};
     }
 
     void wsCompletedSend() override
@@ -123,34 +128,39 @@ public:
 
 class TestServerSession final : public fishnets::WebSocketSession
 {
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         auto ep = wsGetEndpointInfo();
         CHECK(ep.address == "127.0.0.1");
         CHECK(wsTarget() == SessionTargetFixture::target);
+        return {};
     }
 
     void wsClosed() override
     {
     }
 
-    void wsReceivedBinary(itlib::span<uint8_t> binary) override
+    itlib::span<uint8_t> wsReceivedBinary(itlib::span<uint8_t> binary, bool complete) override
     {
+        CHECK(complete);
         REQUIRE(receivedIndex < packets.size());
         CHECK((packets[receivedIndex] == binary));
         sendQueue.push_back(receivedIndex);
         ++receivedIndex;
         send();
+        return {};
     }
 
-    void wsReceivedText(itlib::span<char> text) override
+    itlib::span<uint8_t> wsReceivedText(itlib::span<char> text, bool complete) override
     {
+        CHECK(complete);
         REQUIRE(receivedIndex < packets.size());
         std::string_view str(text.data(), text.size());
         CHECK(packets[receivedIndex] == str);
         sendQueue.push_back(receivedIndex);
         ++receivedIndex;
         send();
+        return {};
     }
 
     void send()

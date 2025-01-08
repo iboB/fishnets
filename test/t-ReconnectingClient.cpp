@@ -17,9 +17,10 @@ static constexpr uint16_t Test_Port = 7655;
 
 class TestClientSession final : public fishnets::WebSocketSession
 {
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         wsSend("hello");
+        return {};
     }
 };
 
@@ -77,16 +78,18 @@ std::atomic_int32_t serverReceivedPackets = {};
 
 class TestServerSession final : public fishnets::WebSocketSession
 {
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         ++openedServerSessions;
+        return {};
     }
-    void wsReceivedText(itlib::span<char> buf) override
+    itlib::span<uint8_t> wsReceivedText(itlib::span<char> buf, bool) override
     {
         ++serverReceivedPackets;
         std::string_view str(buf.data(), buf.size());
         CHECK(str == "hello");
         wsClose();
+        return {};
     }
 };
 

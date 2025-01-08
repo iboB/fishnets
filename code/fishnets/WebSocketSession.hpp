@@ -40,7 +40,8 @@ public:
     void postWSIOTask(std::function<void()> task);
 
     // called when socked connection is established
-    virtual void wsOpened();
+    // return the receive buffer (read about it in the docs of wsReceived*)
+    virtual itlib::span<uint8_t> wsOpened();
 
     // called when connection is closed
     virtual void wsClosed();
@@ -49,8 +50,12 @@ public:
     void wsClose();
 
     // called when data is received
-    virtual void wsReceivedBinary(itlib::span<uint8_t> binary);
-    virtual void wsReceivedText(itlib::span<char> text);
+    // the return value is
+    //  * a receive buffer
+    //  * or an empty span to instead use an internal growable buffer (complete in wsReceived will always be true)
+    // thus the buffer argument is a view of the previously returned span (the one from wsOpened for the initial read)
+    virtual itlib::span<uint8_t> wsReceivedBinary(itlib::span<uint8_t> binary, bool complete);
+    virtual itlib::span<uint8_t> wsReceivedText(itlib::span<char> text, bool complete);
 
     // call to initiate a send
     // only a single write is supported at a time
@@ -94,7 +99,7 @@ private:
     // used for posting IO tasks
     std::unique_ptr<ExecutorHolder> m_ioExecutorHolder;
 
-    void opened(SessionOwnerBase& session);
+    itlib::span<uint8_t> opened(SessionOwnerBase& session);
     void closed();
 };
 

@@ -114,7 +114,7 @@ public:
         // (in case of clients it's already empty so this line would be redundant)
         m_upgradeRequest = {};
 
-        m_session->opened(*this);
+        m_userBuf = m_session->opened(*this);
 
         doRead();
     }
@@ -122,19 +122,31 @@ public:
     // io
 
     virtual void doRead() = 0;
-    void onRead(beast::error_code e, bool text)
+    void onRead(beast::error_code e, bool text, bool complete)
     {
         if (e == websocket::error::closed) return closed();
         if (e) return failed(e, "read");
 
-        auto bufData = m_readBuf.data().data();
-        if (text)
+        void* bufData;
+        size_t bufSize;
+        if (m_userBuf.empty())
         {
-            m_session->wsReceivedText(itlib::make_span(static_cast<char*>(bufData), m_readBuf.size()));
+            bufData = m_readBuf.data().data();
+            bufSize = m_readBuf.size();
         }
         else
         {
-            m_session->wsReceivedBinary(itlib::make_span(static_cast<uint8_t*>(bufData), m_readBuf.size()));
+            bufData = m_userBuf.data();
+            bufSize = m_userBuf.size();
+        }
+
+        if (text)
+        {
+            m_userBuf = m_session->wsReceivedText(itlib::make_span(static_cast<char*>(bufData), bufSize), complete);
+        }
+        else
+        {
+            m_userBuf = m_session->wsReceivedBinary(itlib::make_span(static_cast<uint8_t*>(bufData), bufSize), complete);
         }
 
         m_readBuf.clear();
@@ -217,6 +229,7 @@ public:
     }
 
     beast::flat_buffer m_readBuf;
+    itlib::span<uint8_t> m_userBuf;
     WebSocketSessionPtr m_session;
 
     std::unique_ptr<net::steady_timer> m_heartbeatTimer;
@@ -246,11 +259,11 @@ WebSocketSessionOptions WebSocketSession::getInitialOptions()
     return {};
 }
 
-void WebSocketSession::opened(SessionOwnerBase& session)
+itlib::span<uint8_t> WebSocketSession::opened(SessionOwnerBase& session)
 {
     assert(!m_owner);
     m_owner = &session;
-    wsOpened();
+    return wsOpened();
 }
 
 void WebSocketSession::closed()
@@ -269,7 +282,7 @@ void WebSocketSession::postWSIOTask(std::function<void()> task)
     );
 }
 
-void WebSocketSession::wsOpened() {}
+itlib::span<uint8_t> WebSocketSession::wsOpened() { return {}; }
 void WebSocketSession::wsClosed() {}
 
 void WebSocketSession::wsClose()
@@ -278,8 +291,8 @@ void WebSocketSession::wsClose()
     m_owner->doClose(websocket::close_code::normal);
 }
 
-void WebSocketSession::wsReceivedBinary(itlib::span<uint8_t>) {}
-void WebSocketSession::wsReceivedText(itlib::span<char>) {}
+itlib::span<uint8_t> WebSocketSession::wsReceivedBinary(itlib::span<uint8_t>, bool) { return {}; }
+itlib::span<uint8_t> WebSocketSession::wsReceivedText(itlib::span<char>, bool) { return {}; }
 
 void WebSocketSession::wsSend(itlib::span<const uint8_t> binary, bool complete)
 {
@@ -362,14 +375,23 @@ public:
         m_ws.async_close(code, beast::bind_front_handler(&SessionOwnerBase::onClosed, shared_from(this)));
     }
 
-    void onReadCB(beast::error_code e, size_t)
+    void onReadCB(beast::error_code e, size_t size)
     {
-        onRead(e, m_ws.got_text());
+        if (!m_userBuf.empty()) {
+            m_userBuf = m_userBuf.subspan(0, size);
+        }
+        onRead(e, m_ws.got_text(), m_ws.is_message_done());
     }
 
     void doRead() override final
     {
-        m_ws.async_read(m_readBuf, beast::bind_front_handler(&SessionOwnerT::onReadCB, shared_from(this)));
+        auto cb = beast::bind_front_handler(&SessionOwnerT::onReadCB, shared_from(this));
+        if (m_userBuf.empty()) {
+            m_ws.async_read(m_readBuf, std::move(cb));
+        }
+        else {
+            m_ws.async_read_some(net::buffer(m_userBuf.data(), m_userBuf.size()), std::move(cb));
+        }
     }
 
     void doWrite(bool text, bool complete, net::const_buffer buf) override final

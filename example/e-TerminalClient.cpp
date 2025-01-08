@@ -50,17 +50,19 @@ private:
         wsSend(*m_curPacket);
     }
 
-    void wsOpened() override; // defined below as it depends on the app
+    itlib::span<uint8_t> wsOpened() override; // defined below as it depends on the app
 
-    void wsReceivedBinary(itlib::span<uint8_t> binary) override
+    itlib::span<uint8_t> wsReceivedBinary(itlib::span<uint8_t> binary, bool) override
     {
         std::cout << "Received binary with size " << binary.size() << '\n';
+        return {};
     }
 
-    void wsReceivedText(itlib::span<char> text) override
+    itlib::span<uint8_t> wsReceivedText(itlib::span<char> text, bool) override
     {
         std::string_view str(text.data(), text.size());
         std::cout << "Received text " << str << '\n';
+        return {};
     }
 
     void wsCompletedSend() override
@@ -153,9 +155,10 @@ private:
     std::thread m_serverConnectionThread;
 };
 
-void Session::wsOpened()
+itlib::span<uint8_t> Session::wsOpened()
 {
     m_app.sessionConnected(shared_from_this());
+    return {};
 }
 
 int main()

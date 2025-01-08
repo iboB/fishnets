@@ -107,9 +107,10 @@ public:
 
     uint32_t m_beats = 0;
 
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         send({SessionPacket::Type::Id, id});
+        return {};
     }
 
     void wsHeartbeat(uint32_t ms) override
@@ -146,13 +147,15 @@ public:
 
     uint32_t m_beats = 0;
 
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         send({SessionPacket::Type::Id, id});
 
         fishnets::WebSocketSessionOptions opts;
         opts.heartbeatInterval = std::chrono::milliseconds(90);
         wsSetOptions(opts);
+
+        return {};
     }
 
     void wsHeartbeat(uint32_t ms) override
@@ -193,13 +196,15 @@ public:
 
     uint32_t m_beats = 0;
 
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         send({SessionPacket::Type::Id, id});
 
         fishnets::WebSocketSessionOptions opts;
         opts.heartbeatInterval = std::chrono::milliseconds(50);
         wsSetOptions(opts);
+
+        return {};
     }
 
     void wsHeartbeat(uint32_t ms) override
@@ -263,10 +268,12 @@ CaseResultVec* g_caseResult;
 
 struct ReceiverSession final : public fishnets::WebSocketSession
 {
-    void wsReceivedBinary(itlib::span<uint8_t> binary) final override
+    itlib::span<uint8_t> wsReceivedBinary(itlib::span<uint8_t> binary, bool complete) final override
     {
         REQUIRE(binary.size() == sizeof(SessionPacket));
+        CHECK(complete);
         memcpy(&m_received.emplace_back(), binary.data(), sizeof(SessionPacket));
+        return {};
     }
 
     ~ReceiverSession()

@@ -108,9 +108,10 @@ public:
 
     uint32_t m_beats = 0;
 
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         send({Packet::Type::Id, id});
+        return {};
     }
 
     void wsHeartbeat(uint32_t ms) override
@@ -147,13 +148,14 @@ public:
 
     uint32_t m_beats = 0;
 
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         send({Packet::Type::Id, id});
 
         fishnets::WebSocketSessionOptions opts;
         opts.heartbeatInterval = std::chrono::milliseconds(90);
         wsSetOptions(opts);
+        return {};
     }
 
     void wsHeartbeat(uint32_t ms) override
@@ -194,13 +196,15 @@ public:
 
     uint32_t m_beats = 0;
 
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         send({Packet::Type::Id, id});
 
         fishnets::WebSocketSessionOptions opts;
         opts.heartbeatInterval = std::chrono::milliseconds(50);
         wsSetOptions(opts);
+
+        return {};
     }
 
     void wsHeartbeat(uint32_t ms) override

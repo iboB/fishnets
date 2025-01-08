@@ -14,14 +14,16 @@ TEST_SUITE_BEGIN("fishnets");
 
 class TestClientSession final : public fishnets::WebSocketSession
 {
-    void wsReceivedBinary(itlib::span<uint8_t>) override
+    itlib::span<uint8_t> wsReceivedBinary(itlib::span<uint8_t>, bool) override
     {
         ++receivedPackages;
+        return {};
     }
 
-    void wsReceivedText(itlib::span<char>) override
+    itlib::span<uint8_t> wsReceivedText(itlib::span<char>, bool) override
     {
         ++receivedPackages;
+        return {};
     }
 
 public:
@@ -33,10 +35,11 @@ std::atomic_bool serverSessionDestroyed = false;
 
 class TestServerSession final : public fishnets::WebSocketSession
 {
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         opened = true;
         postWSIOTask([this]() { wsClose(); });
+        return {};
     }
 
     void wsClosed() override

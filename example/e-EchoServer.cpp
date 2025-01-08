@@ -11,11 +11,12 @@
 
 class EchoServerSession final : public fishnets::WebSocketSession
 {
-    void wsOpened() override
+    itlib::span<uint8_t> wsOpened() override
     {
         std::cout << "New session " << this << '\n';
         auto endpoint = wsGetEndpointInfo();
         std::cout << endpoint.address << " : " << endpoint.port << '\n';
+        return {};
     }
 
     void wsClosed() override
@@ -23,13 +24,14 @@ class EchoServerSession final : public fishnets::WebSocketSession
         std::cout << "Closed session " << this << '\n';
     }
 
-    void wsReceivedBinary(itlib::span<uint8_t> binary) override
+    itlib::span<uint8_t> wsReceivedBinary(itlib::span<uint8_t> binary, bool) override
     {
         std::cout << "Received binary with size " << binary.size() << '\n';
         std::cout << "Ignoring\n";
+        return {};
     }
 
-    void wsReceivedText(itlib::span<char> text) override
+    itlib::span<uint8_t> wsReceivedText(itlib::span<char> text, bool) override
     {
         std::string_view str(text.data(), text.size());
         std::cout << "Received text " << str << '\n';
@@ -43,6 +45,7 @@ class EchoServerSession final : public fishnets::WebSocketSession
         {
             std::cout << "Previous send is not complete. Ignoring\n";
         }
+        return {};
     }
 
     void wsCompletedSend() override
