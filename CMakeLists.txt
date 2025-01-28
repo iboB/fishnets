@@ -3,14 +3,17 @@
 #
 cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
 
-project(fishnets)
+project(fishnets
+    VERSION 1.0.0
+    LANGUAGES CXX
+)
 
 # cpm
 include(./get_cpm.cmake)
 
 #######################################
 # cmake lib
-CPMAddPackage(gh:iboB/icm@1.5.2)
+CPMAddPackage(gh:iboB/icm@1.5.4)
 
 set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
@@ -37,7 +40,7 @@ endif()
 #######################################
 # packages
 CPMAddPackage(gh:iboB/splat@1.3.3)
-CPMAddPackage(gh:iboB/itlib@1.11.4)
+CPMAddPackage(gh:iboB/itlib@1.11.5)
 
 find_package(Threads REQUIRED)
 set(fishnetsHaveSsl FALSE)
