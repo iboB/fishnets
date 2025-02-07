@@ -6,6 +6,7 @@
 
 #include <itlib/span.hpp>
 #include <itlib/shared_from.hpp>
+#include <cstdint>
 
 namespace fishnets {
 
@@ -38,8 +39,9 @@ public:
     // AGAIN: THIS IS ONLY VALID ON THE IO THREAD (from a posted task or io callback)
     // the callback will be called with the id of the timer and whether it was cancelled
     // the associated task will extend the lifetime of the handler until the callback is called
-    using TimerCb = std::function<void(uin64_t id, bool cancelled)>;
-    void wsStartTimer(uint64_t id, int32_t msFomNow, TimerCb cb);
+    // starting a timer with a given id will cancel any previous timer with the same id
+    using TimerCb = std::function<void(uint64_t id, bool cancelled)>;
+    void wsStartTimer(uint64_t id, uint32_t msFomNow, TimerCb cb);
 
     // due to the async nature of the system, after cancelling some callbacks may still be called with cancelled = false
     void wsCancelTimer(uint64_t id);
@@ -47,11 +49,12 @@ public:
 
     // entrypoint
     // called when socked connection is established
-    // io ops (including postIoTask) are allowed from this point on
-    virtual void wsOpened();
+    // with the target of the request which initiated the session
+    // io ops (including postIoTask) are only allowed from this point on
+    virtual void wsOpened(std::string_view target);
 
     // called when connection is closed
-    // no io callbacs (wsReceived*, wsCompletedSend) will be called after this (calling wsReceive and wsSend is safe)
+    // no io callbacks (wsReceived*, wsCompletedSend) will be called after this (calling wsReceive and wsSend is safe)
     // wsio tasks and timers will still be executed and new ones can still be posted after this
     // note that this cannot be called unless there are io ops in progress or wsClose has been called
     virtual void wsClosed();
@@ -66,7 +69,7 @@ public:
     // call to initiate a receive
     // only a single receive is supported at a time
     // the lifetime of the memory viewed must be preserved until the corresponding wsReceived* is called
-    // the lifetime of the sesion handler itself will be extended until the corresponding wsReceived* is called
+    // the lifetime of the session handler itself will be extended until the corresponding wsReceived* is called
     // calls to receive without the corresponding wsReceived* of the previous receive being called result in undefined behavior
     // the argument is span to be filled with the received data or an empty span in which case an
     // internal growable buffer will be used (complete in wsReceived* will always be true)
@@ -81,7 +84,7 @@ public:
     // call to initiate a send
     // only a single send is supported at a time
     // the lifetime of the memory viewed must be preserved until the corresponding wsCompletedSend is called
-    // the lifetime of the sesion handler itself will be extended until the corresponding wsCompletedSend is called
+    // the lifetime of the session handler itself will be extended until the corresponding wsCompletedSend is called
     // calls to send without the corresponding wsCompletedSend of the previous send being called result in undefined behavior
     // with complete = false, a partial packet can be sent
     // sending heterogeneous (text-binary) partial packets is not supported
@@ -94,10 +97,6 @@ public:
 
     // set options for the session
     void wsSetOptions(const WsSessionOptions& options);
-
-    // target of the request which initiated the session
-    // will be an empty string on sessions which are not connected
-    std::string_view wsTarget() const;
 
 protected:
     WsSessionHandler();

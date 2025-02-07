@@ -17,13 +17,13 @@ struct WebSocketSessionOptions
     // for clients this will be set as the "User-Agent" HTTP header field
     std::optional<std::string> hostId;
 
-    // max size of incoming message
-    // messages larger than that will be ignored
+    // max size of incoming frame
+    // frames larger than that will be ignored
     std::optional<size_t> maxIncomingMessageSize;
 
     // timeout after which to disconnect when the other side doesn't respond
     // note that this doesn't mean the time in which the other side hasn't communicated
-    // "not respoding" is based on pings which the library does internally
+    // "not responding" is based on pings which the library does internally
     std::optional<std::chrono::milliseconds> idleTimeout;
 
     // interval for wsHeartBeat. 0 means never
