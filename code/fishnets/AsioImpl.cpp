@@ -1,10 +1,12 @@
 // Copyright (c) Borislav Stanimirov
 // SPDX-License-Identifier: MIT
 //
-#include "Context.hpp"
 #include "WsSessionHandler.hpp"
 #include "WsSessionOptions.hpp"
-#include "EndpointInfo.hpp"
+#include "ClientSslSettings.hpp"
+#include "ServerSslSettings.hpp"
+#include "Context.hpp"
+#include "ContextWorkGuard.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
 
@@ -31,5 +33,9 @@ namespace http = beast::http;
 using tcp = net::ip::tcp;
 
 namespace fishnets {
+
+struct Context::Impl {
+    net::io_context ctx;
+};
 
 } // namespace fishnets

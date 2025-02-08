@@ -5,11 +5,13 @@
 #include "API.h"
 #include "WsServerSessionHandlerFactory.hpp"
 #include "WsClientSessionHandlerFactory.hpp"
+#include "EndpointInfo.hpp"
 
 namespace fishnets {
 
 struct ServerSslSettings;
 struct ClientSslSettings;
+class ContextWorkGuard;
 
 class FISHNETS_API Context {
 public:
@@ -22,11 +24,14 @@ public:
     // block the current thread until the context is stopped
     void run();
 
-    // stop the context
+    // force stop the context
     void stop();
 
-    // complete any pending tasks and then stop
-    void completeAndStop();
+    bool stopped() const;
+
+    void restart();
+
+    ContextWorkGuard makeWorkGuard();
 
     void wsServe(
         EndpointInfo endpoint,

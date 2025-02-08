@@ -5,7 +5,7 @@
 #include <string>
 
 namespace fishnets {
-struct WebSocketServerSSLSettings {
+struct ServerSSLSettings {
     // strings or files in pem format
 
     std::string certificate;
