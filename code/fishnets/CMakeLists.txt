@@ -3,6 +3,7 @@
 #
 icm_add_lib(fishnets FISHNETS
     FishnetsImpl.cpp
+    AsioImpl.cpp
 )
 add_library(fishnets::fishnets ALIAS fishnets)
 

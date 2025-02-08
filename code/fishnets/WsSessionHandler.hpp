@@ -6,7 +6,10 @@
 
 #include <itlib/span.hpp>
 #include <itlib/shared_from.hpp>
+#include <itlib/ufunction.hpp>
 #include <cstdint>
+#include <chrono>
+#include <string_view>
 
 namespace fishnets {
 
@@ -15,10 +18,10 @@ class Executor;
 class WebSocket;
 }
 
-class WsSessionOptions;
+struct WsSessionOptions;
 struct EndpointInfo;
 
-class WsSessionHandler : public itlib::enable_shared_from {
+class FISHNETS_API WsSessionHandler : public itlib::enable_shared_from {
 public:
     WsSessionHandler(const WsSessionHandler&) = delete;
     WsSessionHandler& operator=(const WsSessionHandler&) = delete;
@@ -33,15 +36,15 @@ public:
     // ONLY CALL the other ws* functions from within a posted task
     // posting a task will extend the lifetime of the posting handler until the task is complete
     // thus capturing [this] or members by ref, when posting from a handler, is safe
-    void postWsIoTask(std::function<void()> task);
+    void postWsIoTask(itlib::ufunction<void()> task);
 
     // post a task to be executed after a timeout
     // AGAIN: THIS IS ONLY VALID ON THE IO THREAD (from a posted task or io callback)
     // the callback will be called with the id of the timer and whether it was cancelled
     // the associated task will extend the lifetime of the handler until the callback is called
     // starting a timer with a given id will cancel any previous timer with the same id
-    using TimerCb = std::function<void(uint64_t id, bool cancelled)>;
-    void wsStartTimer(uint64_t id, uint32_t msFomNow, TimerCb cb);
+    using TimerCb = itlib::ufunction<void(uint64_t id, bool cancelled)>;
+    void wsStartTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb);
 
     // due to the async nature of the system, after cancelling some callbacks may still be called with cancelled = false
     void wsCancelTimer(uint64_t id);
@@ -108,4 +111,4 @@ private:
     std::unique_ptr<impl::WebSocket> m_socket;
 };
 
-}
+} // namespace fishnets
