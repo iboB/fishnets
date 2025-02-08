@@ -1,9 +1,9 @@
 // Copyright (c) Borislav Stanimirov
 // SPDX-License-Identifier: MIT
 //
+#include "Context.hpp"
 #include "WsSessionHandler.hpp"
 #include "WsSessionOptions.hpp"
-
 #include "EndpointInfo.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
