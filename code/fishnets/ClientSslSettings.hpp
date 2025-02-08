@@ -6,7 +6,7 @@
 #include <string>
 
 namespace fishnets {
-struct ClientSSLSettings {
+struct ClientSslSettings {
     // additional custom certificates to support
     std::vector<std::string> customCertificates;
 

@@ -15,7 +15,7 @@ namespace fishnets {
 
 namespace impl {
 class Executor;
-class WebSocket;
+class WsSession;
 }
 
 struct WsSessionOptions;
@@ -108,7 +108,7 @@ protected:
 
 private:
     std::unique_ptr<impl::Executor> m_executor;
-    std::unique_ptr<impl::WebSocket> m_socket;
+    std::unique_ptr<impl::WsSession> m_session;
 };
 
 } // namespace fishnets

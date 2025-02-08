@@ -24,7 +24,7 @@ public:
     // block the current thread until the context is stopped
     void run();
 
-    // force stop the context
+    // force stop the context (diregarding pending work, including work guards)
     void stop();
 
     bool stopped() const;
@@ -45,6 +45,7 @@ public:
     );
 
 private:
+    friend class ContextWorkGuard;
     struct Impl;
     std::unique_ptr<Impl> m_impl;
 };

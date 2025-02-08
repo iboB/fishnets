@@ -23,7 +23,6 @@ public:
     void reset();
 
 private:
-    friend class Context;
     struct Impl;
     std::unique_ptr<Impl> m_impl;
 };
