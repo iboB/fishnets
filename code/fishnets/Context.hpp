@@ -8,6 +8,9 @@
 
 namespace fishnets {
 
+struct ServerSslSettings;
+struct ClientSslSettings;
+
 class FISHNETS_API Context {
 public:
     Context();
@@ -24,6 +27,17 @@ public:
 
     // complete any pending tasks and then stop
     void completeAndStop();
+
+    void wsServe(
+        EndpointInfo endpoint,
+        WsServerSessionHandlerFactory factory,
+        const ServerSslSettings* ssl = nullptr
+    );
+    void wsConnect(
+        EndpointInfo endpoint,
+        WsClientSessionHandlerFactory factory,
+        const ClientSslSettings* ssl = nullptr
+    );
 
 private:
     struct Impl;
