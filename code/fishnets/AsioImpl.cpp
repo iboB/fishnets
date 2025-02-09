@@ -5,6 +5,7 @@
 #include "WsSessionOptions.hpp"
 #include "Context.hpp"
 #include "ContextWorkGuard.hpp"
+#include "WebSocket.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
 
