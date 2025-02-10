@@ -8,6 +8,7 @@ icm_add_lib(fishnets FISHNETS
 add_library(fishnets::fishnets ALIAS fishnets)
 
 icm_bigobj(FishnetsImpl.cpp)
+icm_bigobj(AsioImpl.cpp)
 
 target_link_libraries(fishnets
     PRIVATE

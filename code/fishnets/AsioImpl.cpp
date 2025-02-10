@@ -6,6 +6,7 @@
 #include "ContextWorkGuard.hpp"
 #include "WebSocket.hpp"
 #include "WsConnectionHandler.hpp"
+#include "Task.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
 
@@ -20,6 +21,7 @@
 #include <itlib/shared_from.hpp>
 
 #include <iostream>
+#include <unordered_map>
 
 #if !defined(FISHNETS_ENABLE_SSL)
 #   define FISHNETS_ENABLE_SSL 1
@@ -90,27 +92,62 @@ ContextWorkGuard Context::makeWorkGuard() {
 using RawWs = ws::stream<tcp::socket>;
 using RawWsSsl = ws::stream<ssl::stream<tcp::socket>>;
 
+class Executor {
+public:
+    net::any_io_executor ex;
+};
+
 struct WebSocket::Impl {
 public:
     virtual ~Impl() = default;
 
-    beast::flat_buffer m_readBuf;
+    beast::flat_buffer m_growableBuf;
     ByteSpan m_userBuf;
 
-    void startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb);
+    ExecutorPtr m_executor;
 
-    void cancelTimer(uint64_t id);
-    void cancelAllTimers();
+    std::unordered_map<uint64_t, net::steady_timer> m_timers;
 
-    bool connected() const;
+    void startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) {
+        auto& timer = [&]() -> net::steady_timer& {
+            auto [it, _] = m_timers.try_emplace(id, m_executor->ex);
+            return it->second;
+        }();
+        timer.expires_after(timeFromNow);
+        timer.async_wait([this, id, cb = std::move(cb)](beast::error_code e) {
+            if (e == net::error::operation_aborted) {
+                cb(id, true);
+            }
+            else {
+                cb(id, false);
+            }
+        });
+    }
 
-    void recv(ByteSpan buf, RecvCb cb);
+    void cancelTimer(uint64_t id) {
+        auto it = m_timers.find(id);
+        if (it != m_timers.end()) {
+            it->second.cancel();
+            m_timers.erase(it);
+        }
+    }
 
-    void send(Packet buf, SendCb cb);
+    void cancelAllTimers() {
+        for (auto& t : m_timers) {
+            t.second.cancel();
+        }
+        m_timers.clear();
+    }
 
-    void close(CloseCb cb);
+    virtual bool connected() const = 0;
 
-    EndpointInfo getEndpointInfo() const;
+    virtual void recv(ByteSpan span, RecvCb cb) = 0;
+
+    virtual void send(ConstPacket packet, SendCb cb) = 0;
+
+    virtual void close(CloseCb cb) = 0;
+
+    virtual EndpointInfo getEndpointInfo() const = 0;
 };
 
 namespace {
@@ -132,9 +169,78 @@ template <typename RawSocket>
 struct WebSocketImplT final : public WebSocket::Impl {
     RawSocket m_ws;
 
-    WebSocketImplT(RawSocket&& ws)
-        : m_ws(std::move(ws))
-    {}
+    WebSocketImplT(RawSocket&& ws) : m_ws(std::move(ws)) {
+        m_executor = itlib::make_shared(Executor{m_ws.get_executor()});
+    }
+
+
+    bool connected() const override {
+        return m_ws.is_open();
+    }
+
+    void recv(WebSocket::ByteSpan span, WebSocket::RecvCb cb) override {
+        m_userBuf = span;
+
+        auto onRead = [this, cb = std::move(cb)](beast::error_code e, size_t size) {
+            if (e) {
+                cb(itlib::unexpected(e.message()));
+                return;
+            }
+
+            WebSocket::Packet packet;
+            if (m_userBuf.empty()) {
+                WebSocket::ByteSpan span(static_cast<uint8_t*>(m_growableBuf.data().data()), m_growableBuf.size());
+                packet.data = span;
+            }
+            else {
+                packet.data = m_userBuf.subspan(0, size);
+            }
+
+            packet.complete = m_ws.is_message_done();
+            packet.text = m_ws.got_text();
+
+            cb(std::move(packet));
+
+            m_growableBuf.clear();
+            m_userBuf = {};
+        };
+
+        if (m_userBuf.empty()) {
+            m_ws.async_read(m_growableBuf, std::move(onRead));
+        }
+        else {
+            m_ws.async_read_some(net::buffer(m_userBuf.data(), m_userBuf.size()), std::move(onRead));
+        }
+    }
+
+    void send(WebSocket::ConstPacket packet, WebSocket::SendCb cb) override {
+        auto onWrite = [cb = std::move(cb)](beast::error_code e, size_t) {
+            if (e) {
+                cb(itlib::unexpected(e.message()));
+            }
+            else {
+                cb({});
+            }
+        };
+
+        m_ws.text(packet.text);
+        m_ws.async_write_some(packet.complete, net::buffer(packet.data.data(), packet.data.size()), std::move(onWrite));
+    }
+
+    void close(WebSocket::CloseCb cb) override {
+        m_ws.async_close(ws::close_code::normal, [cb = std::move(cb)](beast::error_code e) {
+            if (e) {
+                cb(itlib::unexpected(e.message()));
+            }
+            else {
+                cb({});
+            }
+        });
+    }
+
+    EndpointInfo getEndpointInfo() const override {
+        return getEndpointInfoOf(m_ws).value_or(EndpointInfo{});
+    }
 };
 
 struct ServerConnector : public itlib::enable_shared_from {
@@ -341,9 +447,14 @@ void WebSocket::startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, T
 void WebSocket::cancelTimer(uint64_t id) { m_impl->cancelTimer(id); }
 void WebSocket::cancelAllTimers() { m_impl->cancelAllTimers(); }
 bool WebSocket::connected() const { return m_impl->connected(); }
-void WebSocket::recv(ByteSpan buf, RecvCb cb) { m_impl->recv(buf, std::move(cb)); }
-void WebSocket::send(Packet buf, SendCb cb) { m_impl->send(buf, std::move(cb)); }
+void WebSocket::recv(ByteSpan span, RecvCb cb) { m_impl->recv(span, std::move(cb)); }
+void WebSocket::send(ConstPacket packet, SendCb cb) { m_impl->send(packet, std::move(cb)); }
 void WebSocket::close(CloseCb cb) { m_impl->close(std::move(cb)); }
 EndpointInfo WebSocket::getEndpointInfo() const { return m_impl->getEndpointInfo(); }
+const ExecutorPtr& WebSocket::executor() const { return m_impl->m_executor; }
+
+void post(Executor& e, Task task) {
+    net::post(e.ex, std::move(task));
+}
 
 } // namespace fishnets
