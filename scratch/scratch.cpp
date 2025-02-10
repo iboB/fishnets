@@ -275,8 +275,12 @@ DEF_SENDER(SimpleSender);
 DEF_SENDER(ManualHBSender);
 DEF_SENDER(RestartSender);
 
+class Foo : public fishnets::WsSessionHandler {};
+
 int main()
 {
+    Foo foo;
+
     fishnets::WebSocketServer server(Make_ReceiverSession, Test_Port, 2);
 
     std::vector<std::thread> clients;

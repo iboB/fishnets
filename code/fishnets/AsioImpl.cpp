@@ -667,6 +667,7 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
     );
 }
 
+WebSocket::WebSocket() = default;
 WebSocket::WebSocket(std::unique_ptr<Impl> impl) : m_impl(std::move(impl)) {}
 WebSocket::~WebSocket() = default;
 WebSocket::WebSocket(WebSocket&&) noexcept = default;

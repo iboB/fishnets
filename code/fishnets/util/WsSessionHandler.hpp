@@ -4,6 +4,7 @@
 #pragma once
 #include "../API.h"
 #include "../WebSocket.hpp"
+#include "../WsConnectionHandler.hpp"
 #include "../Task.hpp"
 
 #include <itlib/shared_from.hpp>
@@ -16,22 +17,28 @@ struct EndpointInfo;
 
 // utility class for handling a websocket session
 // wraps a WebSocket object and provides a callback interface for handling the session
-class FISHNETS_API WsSessionHandler : public itlib::enable_shared_from {
+class FISHNETS_API WsSessionHandler : public WsConnectionHandler, public itlib::enable_shared_from {
 public:
     WsSessionHandler(const WsSessionHandler&) = delete;
     WsSessionHandler& operator=(const WsSessionHandler&) = delete;
 
-    // will be called on the IO thread shortly after construction to get the initial options.
+    // will be called on the IO strand shortly after construction to get the initial options.
     // no calls to the interface are allowed in this function, not even postSessionIoTask
     // the default implementation returns default-constructed WebSocketOptions
-    virtual WebSocketOptions getInitialOptions();
+    // this comes from WsConnectionHandler and you can override it if you want to provide custom initial options
+    // virtual WebSocketOptions getInitialOptions();
 
-    // post a task to be executed on the io thread of the session
+    // post a task to be executed on the io strand of the session
     // THIS IS THE ONLY FUNCTION WHICH IS VALID ON ANY THREAD
     // ONLY CALL the other ws* functions from within a posted task
     // posting a task will extend the lifetime of the posting handler until the task is complete
     // thus capturing [this] or members by ref, when posting from a handler, is safe
     void postWsIoTask(Task task);
+
+protected:
+    WsSessionHandler();
+    // intentionally not virtual. Objects are not owned through this, but instead through shared pointers
+    ~WsSessionHandler();
 
     // timer interface
     // AGAIN: THIS IS ONLY VALID ON THE IO THREAD (from a posted task or io callback)
@@ -80,12 +87,10 @@ public:
     // set options for the session
     void wsSetOptions(const WebSocketOptions& options);
 
-protected:
-    WsSessionHandler();
-    // intentionally not virtual. Objects are not owned through this, but instead through shared pointers
-    ~WsSessionHandler();
-
 private:
+    virtual void onConnected(WebSocket ws, std::string_view target) final override;
+    virtual void onConnectionError(std::string message) final override;
+
     WebSocket m_ws;
 };
 

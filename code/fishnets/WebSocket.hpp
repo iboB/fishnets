@@ -15,6 +15,7 @@ namespace fishnets {
 
 struct EndpointInfo;
 struct WebSocketOptions;
+class WsSessionHandler;
 class Executor;
 
 class FISHNETS_API WebSocket {
@@ -96,6 +97,8 @@ public:
 
     const ExecutorPtr& executor() const;
 private:
+    friend class WsSessionHandler;
+    WebSocket(); // only WsSessionHandler can create a null WebSocket
     std::unique_ptr<Impl> m_impl;
 };
 
