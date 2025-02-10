@@ -95,7 +95,7 @@ public:
     virtual ~Impl() = default;
 
     beast::flat_buffer m_readBuf;
-    itlib::span<uint8_t> m_userBuf;
+    ByteSpan m_userBuf;
 
     void startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb);
 
@@ -104,9 +104,9 @@ public:
 
     bool connected() const;
 
-    void recv(itlib::span<uint8_t> buf, RecvCb cb);
+    void recv(ByteSpan buf, RecvCb cb);
 
-    void send(BufView buf, SendCb cb);
+    void send(Packet buf, SendCb cb);
 
     void close(CloseCb cb);
 
@@ -167,6 +167,10 @@ template <typename RawSocket>
 struct ServerConnectorT : public ServerConnector {
     RawSocket m_ws;
 
+    ServerConnectorT(RawSocket&& ws)
+        : m_ws(std::move(ws))
+    {}
+
     void acceptUpgrade() override final {
         m_ws.async_accept(m_upgradeRequest,
             beast::bind_front_handler(&ServerConnectorT::onConnectionEstablished, shared_from(this)));
@@ -182,6 +186,8 @@ struct ServerConnectorT : public ServerConnector {
 };
 
 struct ServerConnectorWs final : public ServerConnectorT<RawWs> {
+    using ServerConnectorT<RawWs>::ServerConnectorT;
+
     void accept() override {
         // read upgrade request to accept
         http::async_read(m_ws.next_layer(), m_readBuf, m_upgradeRequest,
@@ -191,6 +197,8 @@ struct ServerConnectorWs final : public ServerConnectorT<RawWs> {
 
 #if FISHNETS_ENABLE_SSL
 struct ServerConnectorSsl final : public ServerConnectorT<RawWsSsl> {
+    using ServerConnectorT<RawWsSsl>::ServerConnectorT;
+
     void accept() override {
         m_ws.next_layer().async_handshake(ssl::stream_base::server,
             beast::bind_front_handler(&ServerConnectorSsl::onAcceptHandshake, shared_from(this)));
@@ -282,6 +290,19 @@ struct WsServer : public itlib::enable_shared_from {
             return;
         }
 
+        std::shared_ptr<ServerConnector> con;
+
+#if FISHNETS_ENABLE_SSL
+        if (m_sslCtx) {
+
+            con = std::make_shared<ServerConnectorSsl>(RawWsSsl(std::move(socket), *m_sslCtx));
+        }
+        else
+#endif
+        {
+            con = std::make_shared<ServerConnectorWs>(RawWs(std::move(socket)));
+        }
+
         // accept more sessions
         doAccept();
     }
@@ -309,5 +330,20 @@ void Context::wsConnect(EndpointInfo endpoint, WsConnectionHandlerPtr handler, c
 }
 
 WsConnectionHandler::~WsConnectionHandler() = default; // just export vtable
+
+WebSocket::WebSocket(std::unique_ptr<Impl> impl) : m_impl(std::move(impl)) {}
+WebSocket::~WebSocket() = default;
+WebSocket::WebSocket(WebSocket&&) noexcept = default;
+WebSocket& WebSocket::operator=(WebSocket&&) noexcept = default;
+void WebSocket::startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) {
+    m_impl->startTimer(id, timeFromNow, std::move(cb));
+}
+void WebSocket::cancelTimer(uint64_t id) { m_impl->cancelTimer(id); }
+void WebSocket::cancelAllTimers() { m_impl->cancelAllTimers(); }
+bool WebSocket::connected() const { return m_impl->connected(); }
+void WebSocket::recv(ByteSpan buf, RecvCb cb) { m_impl->recv(buf, std::move(cb)); }
+void WebSocket::send(Packet buf, SendCb cb) { m_impl->send(buf, std::move(cb)); }
+void WebSocket::close(CloseCb cb) { m_impl->close(std::move(cb)); }
+EndpointInfo WebSocket::getEndpointInfo() const { return m_impl->getEndpointInfo(); }
 
 } // namespace fishnets

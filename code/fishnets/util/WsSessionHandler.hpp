@@ -4,17 +4,13 @@
 #pragma once
 #include "../API.h"
 #include "../WebSocket.hpp"
+#include "../Task.hpp"
 
-#include <itlib/span.hpp>
 #include <itlib/shared_from.hpp>
-#include <itlib/ufunction.hpp>
-#include <cstdint>
-#include <chrono>
 #include <string_view>
 
 namespace fishnets {
 
-class Executor;
 struct WsSessionOptions;
 struct EndpointInfo;
 
@@ -35,13 +31,12 @@ public:
     // ONLY CALL the other ws* functions from within a posted task
     // posting a task will extend the lifetime of the posting handler until the task is complete
     // thus capturing [this] or members by ref, when posting from a handler, is safe
-    void postWsIoTask(itlib::ufunction<void()> task);
+    void postWsIoTask(Task task);
 
     // timer interface
     // AGAIN: THIS IS ONLY VALID ON THE IO THREAD (from a posted task or io callback)
     // extends the lifetime of the session handler until the callback is called
-    using TimerCb = itlib::ufunction<void(uint64_t id, bool cancelled)>;
-    void wsStartTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb);
+    void wsStartTimer(uint64_t id, std::chrono::milliseconds timeFromNow, WebSocket::TimerCb cb);
     void wsCancelTimer(uint64_t id);
     void wsCancelAllTimers();
 
@@ -66,7 +61,7 @@ public:
 
     // call to initiate a receive
     // the lifetime of the session handler itself will be extended until the corresponding wsReceived* is called
-    void wsReceive(itlib::span<uint8_t> buf);
+    void wsReceive(WebSocket::ByteSpan buf);
 
     // the buffer argment of these callbacks is the span provided to wsReceive (or a view of the internal buffer)
     // it will be resized to the size of the received data
@@ -92,7 +87,6 @@ protected:
 
 private:
     WebSocket m_ws;
-    std::shared_ptr<Executor> m_executor;
 };
 
 } // namespace fishnets

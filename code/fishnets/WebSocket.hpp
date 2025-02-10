@@ -3,6 +3,7 @@
 //
 #pragma once
 #include "API.h"
+#include "Executor.hpp"
 #include <itlib/ufunction.hpp>
 #include <itlib/span.hpp>
 #include <itlib/expected.hpp>
@@ -12,6 +13,7 @@
 namespace fishnets {
 
 struct EndpointInfo;
+class Executor;
 
 class FISHNETS_API WebSocket {
 public:
@@ -35,8 +37,10 @@ public:
 
     bool connected() const;
 
-    struct BufView {
-        itlib::span<uint8_t> data;
+    using ByteSpan = itlib::span<uint8_t>;
+
+    struct Packet {
+        ByteSpan data;
         bool complete; // true if the data completes a frame
         bool text; // true if the data is text
     };
@@ -49,9 +53,9 @@ public:
     // internal growable buffer will be used (complete in completion handler will always be true)
     // the buffer argment of the callback is the span provided as a first argument (or a view of the internal buffer)
     // it will be resized to the size of the received data
-    using RecvResult = itlib::expected<BufView, std::string>;
+    using RecvResult = itlib::expected<Packet, std::string>;
     using RecvCb = itlib::ufunction<void(RecvResult)>;
-    void recv(itlib::span<uint8_t> buf, RecvCb cb);
+    void recv(ByteSpan buf, RecvCb cb);
 
     // call to initiate a send
     // only a single send is supported at a time
@@ -61,7 +65,7 @@ public:
     // sending heterogeneous (text-binary) partial packets is not supported
     // the first packet in a chain determines the type, the types of the rest until complete are ignored
     using SendCb = itlib::ufunction<void(itlib::expected<void, std::string>)>;
-    void send(BufView buf, SendCb cb);
+    void send(Packet buf, SendCb cb);
 
     // call to initiate the close of the session
     using CloseCb = itlib::ufunction<void()>;
@@ -70,6 +74,7 @@ public:
     // get the endpoint info of the connection
     EndpointInfo getEndpointInfo() const;
 
+    const ExecutorPtr& executor() const;
 private:
     std::unique_ptr<Impl> m_impl;
 };
