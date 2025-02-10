@@ -608,11 +608,12 @@ void Context::wsConnect(
     std::string_view target,
     SslContext* ssl
 ) {
+    if (target.empty()) target = "/";
     Context_wsConnect(
         *this,
         handler,
         tcp::endpoint(net::ip::make_address(endpoint.address), endpoint.port),
-        endpoint.address + ':' + std::to_string(endpoint.port),
+        endpoint.address,
         std::string(target),
         ssl
     );
@@ -653,7 +654,7 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
             this,
             handler,
             sslCtx,
-            host = std::string(uriSplit.authority),
+            host = std::string(authSplit.host),
             target = std::string(uriSplit.req_path)
         ](beast::error_code e, tcp::resolver::results_type results) mutable {
             if (e) {

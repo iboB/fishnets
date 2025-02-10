@@ -660,8 +660,8 @@ public:
 
         // and initiate
         owner->m_host = addr;
-        owner->m_host += ':';
-        owner->m_host += portstr;
+        //owner->m_host += ':';
+        //owner->m_host += portstr;
         owner->m_target = std::string(target);
         owner->connect(results.begin()->endpoint());
 

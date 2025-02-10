@@ -32,7 +32,7 @@ class OneshotSession final : public fishnets::WebSocketSession
     itlib::span<uint8_t> wsReceivedText(itlib::span<char> text, bool) override
     {
         std::string_view str(text.data(), text.size());
-        std::cout << "Received text " << str << '\n';
+        std::cout << "Received text: " << str << '\n';
         wsClose();
         return {};
     }
@@ -44,13 +44,15 @@ class OneshotSession final : public fishnets::WebSocketSession
 
 int main()
 {
-    // fishnets::WebSocketClientSSLSettings sslSettings;
-    // sslSettings.customCertificates = rootCertificates;
-    // fishnets::WebSocketClient client(std::make_shared<OneshotSession>(), "echo.websocket.org", 443, &sslSettings);
+    fishnets::WebSocketClientSSLSettings sslSettings;
+    sslSettings.customCertificates = rootCertificates;
     // fishnets::WebSocketClient client(std::make_shared<OneshotSession>(), "echo.websocket.org", 80);
     fishnets::WebSocketClient client(
-        [](const fishnets::WebSocketEndpointInfo&) { return std::make_shared<OneshotSession>(); });
-    client.connect("localhost", 7654);
+        [](const fishnets::WebSocketEndpointInfo&) { return std::make_shared<OneshotSession>(); }, &sslSettings);
+
+
+    //client.connect("localhost", 7654);
+    client.connect("echo.websocket.org", 443);
 
     return 0;
 }
