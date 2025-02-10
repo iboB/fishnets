@@ -1,11 +1,11 @@
 // Copyright (c) Borislav Stanimirov
 // SPDX-License-Identifier: MIT
 //
-#include "WsSessionHandler.hpp"
 #include "WsSessionOptions.hpp"
 #include "Context.hpp"
 #include "ContextWorkGuard.hpp"
 #include "WebSocket.hpp"
+#include "WsConnectionHandler.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
 
@@ -17,6 +17,7 @@
 #include <boost/asio/strand.hpp>
 
 #include <itlib/make_ptr.hpp>
+#include <itlib/shared_from.hpp>
 
 #include <iostream>
 
@@ -86,6 +87,32 @@ ContextWorkGuard Context::makeWorkGuard() {
     return ContextWorkGuard(*this);
 }
 
+using RawWs = ws::stream<tcp::socket>;
+using RawWsSsl = ws::stream<ssl::stream<tcp::socket>>;
+
+struct WebSocket::Impl {
+public:
+    virtual ~Impl() = default;
+
+    beast::flat_buffer m_readBuf;
+    itlib::span<uint8_t> m_userBuf;
+
+    void startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb);
+
+    void cancelTimer(uint64_t id);
+    void cancelAllTimers();
+
+    bool connected() const;
+
+    void recv(itlib::span<uint8_t> buf, RecvCb cb);
+
+    void send(BufView buf, SendCb cb);
+
+    void close(CloseCb cb);
+
+    EndpointInfo getEndpointInfo() const;
+};
+
 namespace {
 
 template <typename Socket>
@@ -101,61 +128,91 @@ std::optional<EndpointInfo> getEndpointInfoOf(const Socket& s) {
     return ret;
 }
 
-} // namespace
+template <typename RawSocket>
+struct WebSocketImplT final : public WebSocket::Impl {
+    RawSocket m_ws;
 
-namespace impl {
+    WebSocketImplT(RawSocket&& ws)
+        : m_ws(std::move(ws))
+    {}
+};
 
-class WsSession {
-public:
+struct ServerConnector : public itlib::enable_shared_from {
+    WsConnectionHandlerPtr m_handler;
     beast::flat_buffer m_readBuf;
-    itlib::span<uint8_t> m_userBuf;
-
-    // only relevant when accepting
-    // cleared after the connection is established
     http::request<http::string_body> m_upgradeRequest;
 
-    // target of web socket connection (typically "/")
-    std::string m_target;
-
-    virtual ~WsSession() = default;
-};
-
-template <typename WebSocket>
-struct WsSessionT : public WsSession {
-    WebSocket m_socket;
-};
-
-using WsSessionWs = WsSessionT<ws::stream<tcp::socket>>;
-
-template <typename WebSocket>
-void WsSession_onUpgradeRequest(WsSessionT<WebSocket>& self, const WsSessionHandlerPtr& handler, beast::error_code e) {
-    // if (e) return failed(e, "upgrade");
-    if (!ws::is_upgrade(self.m_upgradeRequest)) {
-        //return failed(websocket::error::no_connection_upgrade, "upgrade");
+    void failed(beast::error_code e, std::string_view where) {
+        auto msg = std::string(where);
+        msg += ": ";
+        msg += e.message();
+        m_handler->onConnectionError(msg);
     }
-    self.m_target = self.m_upgradeRequest.target();
-    //acceptUpgrade();
-    self.m_readBuf.clear();
-}
 
-void WsSession_accept(WsSessionWs& self, const WsSessionHandlerPtr& handler) {
-    // read upgrade request to accept
-    http::async_read(self.m_socket.next_layer(), self.m_readBuf, self.m_upgradeRequest,
-        [&self, handler](beast::error_code ec, size_t /*bytesTransfered*/) {
-            WsSession_onUpgradeRequest(self, handler, {});
+    virtual void accept() = 0;
+
+    void onUpgradeRequest(beast::error_code e, size_t /*bytesTransfered*/)
+    {
+        if (e) return failed(e, "upgrade");
+        if (!ws::is_upgrade(m_upgradeRequest)) {
+            return failed(ws::error::no_connection_upgrade, "upgrade");
         }
-    );
-}
+        acceptUpgrade();
+    }
 
-} // namespace impl
+    virtual void acceptUpgrade() = 0;
+};
+
+template <typename RawSocket>
+struct ServerConnectorT : public ServerConnector {
+    RawSocket m_ws;
+
+    void acceptUpgrade() override final {
+        m_ws.async_accept(m_upgradeRequest,
+            beast::bind_front_handler(&ServerConnectorT::onConnectionEstablished, shared_from(this)));
+    }
+
+    void onConnectionEstablished(beast::error_code e) {
+        if (e) return failed(e, "accept");
+        m_handler->onConnected(
+            WebSocket(std::make_unique<WebSocketImplT<RawSocket>>(std::move(m_ws))),
+            m_upgradeRequest.target()
+        );
+    }
+};
+
+struct ServerConnectorWs final : public ServerConnectorT<RawWs> {
+    void accept() override {
+        // read upgrade request to accept
+        http::async_read(m_ws.next_layer(), m_readBuf, m_upgradeRequest,
+            beast::bind_front_handler(&ServerConnector::onUpgradeRequest, shared_from(this)));
+    }
+};
+
+#if FISHNETS_ENABLE_SSL
+struct ServerConnectorSsl final : public ServerConnectorT<RawWsSsl> {
+    void accept() override {
+        m_ws.next_layer().async_handshake(ssl::stream_base::server,
+            beast::bind_front_handler(&ServerConnectorSsl::onAcceptHandshake, shared_from(this)));
+    }
+
+    void onAcceptHandshake(beast::error_code e) {
+        if (e) return failed(e, "accept");
+        // read upgrade request to accept
+        http::async_read(m_ws.next_layer(), m_readBuf, m_upgradeRequest,
+            beast::bind_front_handler(&ServerConnector::onUpgradeRequest, shared_from(this)));
+    }
+};
+#endif
+
+} // namespace
 
 namespace {
 struct WsServer : public itlib::enable_shared_from {
     net::io_context& m_ctx;
+    WsServerConnectionHandlerFactory m_factory;
 
     tcp::acceptor m_acceptor;
-
-    WsServerSessionHandlerFactory m_factory;
 
 #if FISHNETS_ENABLE_SSL
     std::unique_ptr<ssl::context> m_sslCtx;
@@ -164,13 +221,13 @@ struct WsServer : public itlib::enable_shared_from {
 
     WsServer(
         net::io_context& ctx,
-        WsServerSessionHandlerFactory&& factory,
-        tcp::endpoint endpoint,
-        ServerSslSettings* sslSettings
+        WsServerConnectionHandlerFactory factory,
+        const tcp::endpoint& endpoint,
+        const ServerSslSettings* sslSettings
     )
         : m_ctx(ctx)
-        , m_acceptor(ctx, endpoint)
         , m_factory(std::move(factory))
+        , m_acceptor(ctx, endpoint)
     {
         if (sslSettings) {
 #if FISHNETS_ENABLE_SSL
@@ -216,8 +273,10 @@ struct WsServer : public itlib::enable_shared_from {
             std::cerr << "socket disconnected while accepting\n";
             return;
         }
-        auto session = m_factory(*ep);
-        if (!session) {
+
+        auto handler = m_factory(*ep);
+
+        if (!handler) {
             std::cout << "session declined\n";
             doAccept();
             return;
@@ -229,10 +288,26 @@ struct WsServer : public itlib::enable_shared_from {
 };
 } // namespace
 
-void Context::wsServe(EndpointInfo endpoint, WsServerSessionHandlerFactory factory, const ServerSslSettings* ssl) {
+void Context::wsServe(EndpointInfo endpoint, WsServerConnectionHandlerFactory factory, const ServerSslSettings* ssl) {
+    auto ep = [&] {
+        if (endpoint.address == IPv4) {
+            return tcp::endpoint(tcp::v4(), endpoint.port);
+        }
+        else if (endpoint.address == IPv6) {
+            return tcp::endpoint(tcp::v6(), endpoint.port);
+        }
+        else {
+            return tcp::endpoint(net::ip::make_address(endpoint.address), endpoint.port);
+        }
+    }();
+
+    auto server = std::make_shared<WsServer>(m_impl->ctx, std::move(factory), ep, ssl);
+    server->doAccept();
 }
 
-void Context::wsConnect(EndpointInfo endpoint, WsClientSessionHandlerFactory factory, const ClientSslSettings* ssl) {
+void Context::wsConnect(EndpointInfo endpoint, WsConnectionHandlerPtr handler, const ClientSslSettings* ssl) {
 }
+
+WsConnectionHandler::~WsConnectionHandler() = default; // just export vtable
 
 } // namespace fishnets

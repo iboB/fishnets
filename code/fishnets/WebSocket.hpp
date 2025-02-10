@@ -13,11 +13,12 @@ namespace fishnets {
 
 class FISHNETS_API WebSocket {
 public:
-    WebSocket();
+    struct Impl;
+    explicit WebSocket(std::unique_ptr<Impl>);
     ~WebSocket();
 
-    WebSocket(const WebSocket&) = delete;
-    WebSocket& operator=(const WebSocket&) = delete;
+    WebSocket(WebSocket&&) noexcept;
+    WebSocket& operator=(WebSocket&&) noexcept;
 
     // post a task to be executed after a timeout
     // the callback will be called with the id of the timer and whether it was cancelled
@@ -68,7 +69,6 @@ public:
     EndpointInfo getEndpointInfo() const;
 
 private:
-    struct Impl;
     std::unique_ptr<Impl> m_impl;
 };
 

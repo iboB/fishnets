@@ -3,14 +3,14 @@
 //
 #pragma once
 #include "API.h"
-#include "WsServerSessionHandlerFactory.hpp"
-#include "WsClientSessionHandlerFactory.hpp"
+#include "WsServerConnectionHandlerFactory.hpp"
 #include "EndpointInfo.hpp"
 
 namespace fishnets {
 
 struct ServerSslSettings;
 struct ClientSslSettings;
+class WsServerHandler;
 class ContextWorkGuard;
 
 class FISHNETS_API Context {
@@ -35,12 +35,12 @@ public:
 
     void wsServe(
         EndpointInfo endpoint,
-        WsServerSessionHandlerFactory factory,
+        WsServerConnectionHandlerFactory factory,
         const ServerSslSettings* ssl = nullptr
     );
     void wsConnect(
         EndpointInfo endpoint,
-        WsClientSessionHandlerFactory factory,
+        WsConnectionHandlerPtr handler,
         const ClientSslSettings* ssl = nullptr
     );
 
