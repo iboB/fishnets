@@ -24,6 +24,8 @@
 #include <charconv>
 #include <unordered_map>
 
+#include <furi/furi.hpp>
+
 #if !defined(FISHNETS_ENABLE_SSL)
 #   define FISHNETS_ENABLE_SSL 1
 #endif
@@ -528,7 +530,7 @@ void Context_wsConnect(
     WsConnectionHandlerPtr& handler,
     tcp::endpoint ep,
     std::string host,
-    std::string_view target,
+    std::string target,
     SslContext* ssl
 ) {
     std::shared_ptr<ClientConnector> con;
@@ -546,8 +548,7 @@ void Context_wsConnect(
     con->m_handler = std::move(handler);
 
     con->m_host = std::move(host);
-    if (target.empty()) target = "/";
-    con->m_target = std::string(target);
+    con->m_target = std::move(target);
 
     con->connect(std::move(ep));
 }
@@ -563,13 +564,57 @@ void Context::wsConnect(
         handler,
         tcp::endpoint(net::ip::make_address(endpoint.address), endpoint.port),
         endpoint.address + ':' + std::to_string(endpoint.port),
-        target,
+        std::string(target),
         ssl
     );
 }
 
-void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view host, SslContext* sslCtx) {
+void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, SslContext* sslCtx) {
+    auto uriSplit = furi::uri_split::from_uri(url);
+    if (uriSplit.scheme) {
+        if (uriSplit.scheme == "http") {
+            sslCtx = nullptr;
+        }
+        else if (uriSplit.scheme == "https") {
+            if (!sslCtx) {
+                handler->onConnectionError("https scheme requires an ssl context");
+                return;
+            }
+        }
+        else {
+            handler->onConnectionError(std::string("unsupported scheme: ") + std::string(uriSplit.scheme));
+            return;
+        }
+    }
 
+    auto authSplit = furi::authority_split::from_authority(uriSplit.authority);
+    if (authSplit.userinfo) {
+        handler->onConnectionError("userinfo not supported");
+        return;
+    }
+
+    auto port = authSplit.port;
+    if (!port) {
+        port = sslCtx ? "443" : "80";
+    }
+
+    tcp::resolver resolver(m_impl->ctx);
+    resolver.async_resolve(authSplit.host, port,
+        [
+            this,
+            handler,
+            sslCtx,
+            host = std::string(uriSplit.authority),
+            target = std::string(uriSplit.req_path)
+        ](beast::error_code e, tcp::resolver::results_type results) mutable {
+            if (e) {
+                handler->onConnectionError(std::string("resolve: ") + e.message());
+                return;
+            }
+
+            Context_wsConnect(*this, handler, *results.begin(), std::move(host), std::move(target), sslCtx);
+        }
+    );
 }
 
 WsConnectionHandler::~WsConnectionHandler() = default; // just export vtable

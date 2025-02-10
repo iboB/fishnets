@@ -41,12 +41,12 @@ public:
     void wsConnect(
         WsConnectionHandlerPtr handler,
         const EndpointInfo& endpoint,
-        std::string_view target = {},
+        std::string_view target = "/",
         SslContext* sslCtx = nullptr
     );
     void wsConnect(
         WsConnectionHandlerPtr handler,
-        std::string_view host,
+        std::string_view url,
         SslContext* sslCtx = nullptr
     );
 

@@ -59,6 +59,8 @@ if(NOT TARGET Boost::beast)
     add_library(Boost::beast ALIAS Boost::boost)
 endif()
 
+CPMAddPackage(gh:iboB/furi@1.2.1)
+
 #######################################
 # subdirs
 

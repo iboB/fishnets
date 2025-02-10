@@ -12,6 +12,7 @@ icm_bigobj(AsioImpl.cpp)
 
 target_link_libraries(fishnets
     PRIVATE
+        furi::furi
         Boost::beast
         ${CMAKE_THREAD_LIBS_INIT}
     PUBLIC
