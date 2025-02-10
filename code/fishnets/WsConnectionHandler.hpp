@@ -10,6 +10,7 @@
 namespace fishnets {
 
 class WebSocket;
+struct WebSocketOptions;
 
 class FISHNETS_API WsConnectionHandler {
 public:
@@ -19,6 +20,9 @@ public:
 
     virtual void onConnected(WebSocket ws, std::string_view target) = 0;
     virtual void onConnectionError(std::string message) = 0;
+
+    // default implementation returns default options
+    virtual WebSocketOptions getInitialOptions();
 };
 
 } // namespace fishnets

@@ -1,12 +1,12 @@
 // Copyright (c) Borislav Stanimirov
 // SPDX-License-Identifier: MIT
 //
-#include "WsSessionOptions.hpp"
 #include "Context.hpp"
 #include "ContextWorkGuard.hpp"
 #include "WebSocket.hpp"
 #include "WsConnectionHandler.hpp"
 #include "Task.hpp"
+#include "WebSocketOptions.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
 
@@ -289,6 +289,21 @@ struct WebSocketImplT final : public WebSocket::Impl {
     EndpointInfo getEndpointInfo() const override {
         return getEndpointInfoOf(m_ws).value_or(EndpointInfo{});
     }
+
+    void setOptions(WebSocketOptions opts) {
+        // ignore hostId, as it's only applicable when connecting
+
+        if (opts.maxIncomingMessageSize) {
+            m_ws.read_message_max(*opts.maxIncomingMessageSize);
+        }
+
+        if (opts.pongTimeout) {
+            ws::stream_base::timeout t;
+            m_ws.get_option(t);
+            t.idle_timeout = *opts.pongTimeout;
+            m_ws.set_option(t);
+        }
+    }
 };
 
 struct BasicConnector : public itlib::enable_shared_from {
@@ -307,10 +322,11 @@ struct ServerConnector : public BasicConnector {
     beast::flat_buffer m_readBuf;
     http::request<http::string_body> m_upgradeRequest;
 
+    virtual void setInitialOptions(WebSocketOptions opts) = 0;
+
     virtual void accept() = 0;
 
-    void onUpgradeRequest(beast::error_code e, size_t /*bytesTransfered*/)
-    {
+    void onUpgradeRequest(beast::error_code e, size_t /*bytesTransfered*/) {
         if (e) return failed(e, "upgrade");
         if (!ws::is_upgrade(m_upgradeRequest)) {
             return failed(ws::error::no_connection_upgrade, "upgrade");
@@ -330,6 +346,22 @@ struct ServerConnectorT : public ServerConnector {
     ServerConnectorT(RawSocket&& ws)
         : m_ws(std::move(ws))
     {}
+
+    void setInitialOptions(WebSocketOptions opts) override final {
+        m_ws.read_message_max(opts.maxIncomingMessageSize.value_or(16 * 1024 * 1024));
+
+        using bsb = ws::stream_base;
+        auto timeout = bsb::timeout::suggested(beast::role_type::server);
+        if (opts.pongTimeout) timeout.idle_timeout = *opts.pongTimeout;
+        m_ws.set_option(timeout);
+
+        auto id = opts.hostId.value_or(
+            std::string("fishnets-ws-server ") + BOOST_BEAST_VERSION_STRING
+        );
+        m_ws.set_option(bsb::decorator([id = std::move(id)](ws::response_type& res) {
+            res.set(http::field::server, id);
+        }));
+    }
 
     void acceptUpgrade() override final {
         m_ws.async_accept(m_upgradeRequest,
@@ -433,6 +465,10 @@ struct WsServer : public itlib::enable_shared_from {
             con = std::make_shared<ServerConnectorWs>(RawWs(std::move(socket)));
         }
 
+        con->m_handler = std::move(handler);
+        con->setInitialOptions(handler->getInitialOptions());
+        con->accept();
+
         // accept more sessions
         doAccept();
     }
@@ -453,19 +489,33 @@ struct ClientConnectorT : public ClientConnector {
 
     ClientConnectorT(RawSocket&& ws) : m_ws(std::move(ws)) {}
 
-    void connect(tcp::endpoint endpoint) override final
-    {
+    void connect(tcp::endpoint endpoint) override final {
         beast::get_lowest_layer(m_ws).async_connect(endpoint,
             beast::bind_front_handler(&ClientConnectorT::onConnect, shared_from(this)));
     }
 
     virtual void onConnect(beast::error_code e) = 0;
 
-    void onReadyForWSHandshake(beast::error_code e)
-    {
+    void setInitialOptions(WebSocketOptions opts) {
+        m_ws.read_message_max(opts.maxIncomingMessageSize.value_or(2 * 1024 * 1024));
+
+        using bsb = ws::stream_base;
+        auto timeout = bsb::timeout::suggested(beast::role_type::client);
+        if (opts.pongTimeout) timeout.idle_timeout = *opts.pongTimeout;
+        m_ws.set_option(timeout);
+
+        auto id = opts.hostId.value_or(
+            std::string("fishnets-ws-client ") + BOOST_BEAST_VERSION_STRING
+        );
+        m_ws.set_option(bsb::decorator([id = std::move(id)](ws::request_type& req) {
+            req.set(http::field::user_agent, id);
+        }));
+    }
+
+    void onReadyForWSHandshake(beast::error_code e) {
         if (e) return failed(e, "ws connect");
 
-        //setInitialClientOptions(m_session->getInitialOptions());
+        setInitialOptions(m_handler->getInitialOptions());
 
         m_ws.async_handshake(m_host, m_target,
             beast::bind_front_handler(&ClientConnectorT::onConnectionEstablished, shared_from(this)));
@@ -494,8 +544,7 @@ struct ClientConnectorSsl final : public ClientConnectorT<RawWsSsl> {
         if (e) return failed(e, "connect");
 
         // Set SNI Hostname (many hosts need this to handshake successfully)
-        if (!SSL_set_tlsext_host_name(m_ws.next_layer().native_handle(), m_host.c_str()))
-        {
+        if (!SSL_set_tlsext_host_name(m_ws.next_layer().native_handle(), m_host.c_str())) {
             e = beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category());
             return failed(e, "connect");
         }
@@ -616,8 +665,6 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
         }
     );
 }
-
-WsConnectionHandler::~WsConnectionHandler() = default; // just export vtable
 
 WebSocket::WebSocket(std::unique_ptr<Impl> impl) : m_impl(std::move(impl)) {}
 WebSocket::~WebSocket() = default;

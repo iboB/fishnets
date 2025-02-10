@@ -9,10 +9,12 @@
 #include <itlib/expected.hpp>
 #include <memory>
 #include <string>
+#include <chrono>
 
 namespace fishnets {
 
 struct EndpointInfo;
+struct WebSocketOptions;
 class Executor;
 
 class FISHNETS_API WebSocket {
@@ -88,6 +90,9 @@ public:
 
     // get the endpoint info of the connection
     EndpointInfo getEndpointInfo() const;
+
+    // set options for the session
+    void setOptions(const WebSocketOptions& options);
 
     const ExecutorPtr& executor() const;
 private:

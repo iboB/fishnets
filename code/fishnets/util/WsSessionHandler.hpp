@@ -11,7 +11,7 @@
 
 namespace fishnets {
 
-struct WsSessionOptions;
+struct WebSocketOptions;
 struct EndpointInfo;
 
 // utility class for handling a websocket session
@@ -23,8 +23,8 @@ public:
 
     // will be called on the IO thread shortly after construction to get the initial options.
     // no calls to the interface are allowed in this function, not even postSessionIoTask
-    // the default implementation returns default-constructed WsSessionOptions
-    virtual WsSessionOptions getInitialOptions();
+    // the default implementation returns default-constructed WebSocketOptions
+    virtual WebSocketOptions getInitialOptions();
 
     // post a task to be executed on the io thread of the session
     // THIS IS THE ONLY FUNCTION WHICH IS VALID ON ANY THREAD
@@ -78,7 +78,7 @@ public:
     EndpointInfo wsGetEndpointInfo() const;
 
     // set options for the session
-    void wsSetOptions(const WsSessionOptions& options);
+    void wsSetOptions(const WebSocketOptions& options);
 
 protected:
     WsSessionHandler();

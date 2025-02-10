@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: MIT
 //
 #pragma once
-
 #include <optional>
 #include <string>
 #include <chrono>
 #include <cstddef>
 
 namespace fishnets {
-struct WsSessionOptions {
+struct WebSocketOptions {
     // id/name of host
     // for servers this will be set as the "Server" HTTP header field
     // for clients this will be set as the "User-Agent" HTTP header field
