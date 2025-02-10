@@ -11,6 +11,8 @@
 
 namespace fishnets {
 
+struct EndpointInfo;
+
 class FISHNETS_API WebSocket {
 public:
     struct Impl;

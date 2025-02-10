@@ -5,7 +5,7 @@
 #include <fishnets/WebSocketServer.hpp>
 #include <fishnets/WebSocketSession.hpp>
 #include <fishnets/WebSocketSessionOptions.hpp>
-#include <fishnets/WsSessionHandler.hpp>
+#include <fishnets/util/WsSessionHandler.hpp>
 
 #include <mutex>
 #include <thread>
