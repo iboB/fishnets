@@ -622,10 +622,10 @@ void Context::wsConnect(
 void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, SslContext* sslCtx) {
     auto uriSplit = furi::uri_split::from_uri(url);
     if (uriSplit.scheme) {
-        if (uriSplit.scheme == "http") {
+        if (uriSplit.scheme == "http" || uriSplit.scheme == "ws") {
             sslCtx = nullptr;
         }
-        else if (uriSplit.scheme == "https") {
+        else if (uriSplit.scheme == "https" || uriSplit.scheme == "wss") {
             if (!sslCtx) {
                 handler->onConnectionError("https scheme requires an ssl context");
                 return;
