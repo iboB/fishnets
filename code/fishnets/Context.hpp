@@ -8,8 +8,7 @@
 
 namespace fishnets {
 
-struct ServerSslSettings;
-struct ClientSslSettings;
+class SslContext;
 class WsServerHandler;
 class ContextWorkGuard;
 
@@ -34,19 +33,26 @@ public:
     ContextWorkGuard makeWorkGuard();
 
     void wsServe(
-        EndpointInfo endpoint,
+        const EndpointInfo& endpoint,
         WsServerConnectionHandlerFactory factory,
-        const ServerSslSettings* ssl = nullptr
-    );
-    void wsConnect(
-        EndpointInfo endpoint,
-        WsConnectionHandlerPtr handler,
-        const ClientSslSettings* ssl = nullptr
+        SslContext* sslCtx = nullptr
     );
 
+    void wsConnect(
+        WsConnectionHandlerPtr handler,
+        const EndpointInfo& endpoint,
+        std::string_view target = {},
+        SslContext* sslCtx = nullptr
+    );
+    void wsConnect(
+        WsConnectionHandlerPtr handler,
+        std::string_view host,
+        SslContext* sslCtx = nullptr
+    );
+
+    struct Impl; // opaque implementation
+    Impl& impl() { return *m_impl; }
 private:
-    friend class ContextWorkGuard;
-    struct Impl;
     std::unique_ptr<Impl> m_impl;
 };
 
