@@ -211,8 +211,6 @@ struct WebSocketImplT final : public WebSocketImpl {
     }
 
     void recv(WebSocket::ByteSpan span, WebSocket::RecvCb cb) override {
-        m_userBuf = span;
-
         auto onRead = [this, cb = std::move(cb)](beast::error_code e, size_t size) {
             if (e) {
                 cb(itlib::unexpected(e.message()));
@@ -233,11 +231,12 @@ struct WebSocketImplT final : public WebSocketImpl {
 
             cb(std::move(packet));
 
-            m_growableBuf.clear();
             m_userBuf = {};
         };
 
+        m_userBuf = span;
         if (m_userBuf.empty()) {
+            m_growableBuf.clear();
             m_ws.async_read(m_growableBuf, std::move(onRead));
         }
         else {
@@ -393,7 +392,14 @@ struct ClientConnector : public BasicConnector {
     std::string m_host;
     std::string m_target;
 
-    virtual void connect(tcp::endpoint endpoint) = 0;
+    std::vector<tcp::endpoint> m_endpoints;
+
+    void connect(std::vector<tcp::endpoint> endpoints) {
+        m_endpoints = std::move(endpoints);
+        doConnect();
+    }
+
+    virtual void doConnect() = 0;
 protected:
     ~ClientConnector() = default;
 };
@@ -404,12 +410,12 @@ struct ClientConnectorT : public ClientConnector {
 
     ClientConnectorT(RawSocket&& ws) : m_ws(std::move(ws)) {}
 
-    void connect(tcp::endpoint endpoint) override final {
-        beast::get_lowest_layer(m_ws).async_connect(endpoint,
+    void doConnect() override final {
+        async_connect(beast::get_lowest_layer(m_ws), m_endpoints,
             beast::bind_front_handler(&ClientConnectorT::onConnect, shared_from(this)));
     }
 
-    virtual void onConnect(beast::error_code e) = 0;
+    virtual void onConnect(beast::error_code e, const tcp::endpoint& ep) = 0;
 
     void setInitialOptions(WebSocketOptions opts) {
         m_ws.read_message_max(opts.maxIncomingMessageSize.value_or(2 * 1024 * 1024));
@@ -447,7 +453,7 @@ struct ClientConnectorT : public ClientConnector {
 
 struct ClientConnectorWs final : public ClientConnectorT<RawWs> {
     using ClientConnectorT<RawWs>::ClientConnectorT;
-    void onConnect(beast::error_code e) override {
+    void onConnect(beast::error_code e, const tcp::endpoint&) override {
         onReadyForWSHandshake(e);
     }
 };
@@ -455,7 +461,7 @@ struct ClientConnectorWs final : public ClientConnectorT<RawWs> {
 #if FISHNETS_ENABLE_SSL
 struct ClientConnectorSsl final : public ClientConnectorT<RawWsSsl> {
     using ClientConnectorT<RawWsSsl>::ClientConnectorT;
-    void onConnect(beast::error_code e) override {
+    void onConnect(beast::error_code e, const tcp::endpoint&) override {
         if (e) return failed(e, "connect");
 
         // Set SNI Hostname (many hosts need this to handshake successfully)
@@ -588,7 +594,7 @@ void Context::wsServe(const EndpointInfo& endpoint, WsServerHandlerPtr handler, 
 void Context_wsConnect(
     Context& self,
     WsConnectionHandlerPtr& handler,
-    tcp::endpoint ep,
+    std::vector<tcp::endpoint> eps,
     std::string host,
     std::string target,
     SslContext* ssl
@@ -610,7 +616,7 @@ void Context_wsConnect(
     con->m_host = std::move(host);
     con->m_target = std::move(target);
 
-    con->connect(std::move(ep));
+    con->connect(std::move(eps));
 }
 
 void Context::wsConnect(
@@ -623,7 +629,7 @@ void Context::wsConnect(
     Context_wsConnect(
         *this,
         handler,
-        tcp::endpoint(net::ip::make_address(endpoint.address), endpoint.port),
+        {tcp::endpoint(net::ip::make_address(endpoint.address), endpoint.port)},
         endpoint.address,
         std::string(target),
         ssl
@@ -675,7 +681,12 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
                 return;
             }
 
-            Context_wsConnect(*this, handler, *results.begin(), std::move(host), std::move(target), sslCtx);
+            std::vector<tcp::endpoint> eps;
+            for (auto& ep : results) {
+                eps.push_back(ep.endpoint());
+            }
+
+            Context_wsConnect(*this, handler, std::move(eps), std::move(host), std::move(target), sslCtx);
         }
     );
 }
