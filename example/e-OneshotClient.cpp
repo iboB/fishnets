@@ -45,12 +45,10 @@ int main() {
 
     ctx.wsConnect(
         std::make_shared<OneshotSession>(),
-        "wss://echo.websocket.org",
+        //"wss://echo.websocket.org",
+        "ws://localhost:7654",
         &ssl
     );
-    //client.connect("localhost", 7654);
-    //client.connect("echo.websocket.org", 80);
-    // client.connect("echo.websocket.org", 443);
 
     ctx.run();
 

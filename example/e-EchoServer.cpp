@@ -1,80 +1,60 @@
 // Copyright (c) Borislav Stanimirov
 // SPDX-License-Identifier: MIT
 //
-#include <fishnets/WebSocketServer.hpp>
-#include <fishnets/WebSocketSession.hpp>
-#include <fishnets/WebSocketEndpointInfo.hpp>
-#include <fishnets/WebSocketServerSSLSettings.hpp>
+#include <fishnets/Context.hpp>
+#include <fishnets/WsServerHandler.hpp>
+#include <fishnets/util/WsSessionHandler.hpp>
 
 #include <iostream>
 #include <thread>
 
-class EchoServerSession final : public fishnets::WebSocketSession
-{
-    itlib::span<uint8_t> wsOpened() override
-    {
-        std::cout << "New session " << this << '\n';
-        auto endpoint = wsGetEndpointInfo();
-        std::cout << endpoint.address << " : " << endpoint.port << '\n';
-        return {};
+class EchoServerSession final : public fishnets::WsSessionHandler {
+    void wsOpened(std::string_view target) override {
+        auto ep = wsGetEndpointInfo();
+        std::cout << "New session from to '" << target << "' from " << ep.address << ':' << ep.port << '\n';
+        wsReceive();
     }
 
-    void wsClosed() override
-    {
-        std::cout << "Closed session " << this << '\n';
-    }
-
-    itlib::span<uint8_t> wsReceivedBinary(itlib::span<uint8_t> binary, bool) override
-    {
+    void wsReceivedBinary(itlib::span<uint8_t> binary, bool) override {
         std::cout << "Received binary with size " << binary.size() << '\n';
         std::cout << "Ignoring\n";
-        return {};
+        wsReceive();
     }
 
-    itlib::span<uint8_t> wsReceivedText(itlib::span<char> text, bool) override
-    {
+    void wsReceivedText(itlib::span<char> text, bool) override {
         std::string_view str(text.data(), text.size());
         std::cout << "Received text " << str << '\n';
-        if (m_sent.empty())
-        {
+        if (m_send.empty()) {
             std::cout << "Sending back\n";
-            m_sent = str;
-            wsSend(m_sent);
+            m_send = str;
+            wsSend(m_send);
         }
-        else
-        {
+        else {
             std::cout << "Previous send is not complete. Ignoring\n";
         }
-        return {};
+        wsReceive();
     }
 
-    void wsCompletedSend() override
-    {
+    void wsCompletedSend() override {
         std::cout << "Completed send. Ready for more\n";
-        m_sent.clear();
+        m_send.clear();
     }
 
-    std::string m_sent;
+    std::string m_send;
 };
-
-fishnets::WebSocketSessionPtr makeSession(const fishnets::WebSocketEndpointInfo&)
-{
-    return std::make_shared<EchoServerSession>();
-}
 
 #include "ServerCertificate.inl"
 
-int main()
-{
-    fishnets::WebSocketServerSSLSettings* psslSettings = nullptr;
+int main() {
+    fishnets::Context ctx;
 
-    // fishnets::WebSocketServerSSLSettings sslSettings;
-    // sslSettings.certificate = certificate;
-    // sslSettings.privateKey = privateKey;
-    // sslSettings.tmpDH = tmpDH;
-    // psslSettings = &sslSettings;
+    ctx.wsServe(
+        {fishnets::IPv4, 7654},
+        std::make_shared<fishnets::SimpleServerHandler>([](const fishnets::EndpointInfo&) {
+            return std::make_shared<EchoServerSession>();
+        })
+    );
 
-    fishnets::WebSocketServer server(makeSession, 7654, 3, psslSettings);
-    while (true) std::this_thread::sleep_for(std::chrono::seconds(1));
+    ctx.run();
     return 0;
 }
