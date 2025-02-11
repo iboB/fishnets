@@ -5,6 +5,7 @@
 #include "ContextWorkGuard.hpp"
 #include "WebSocket.hpp"
 #include "WsConnectionHandler.hpp"
+#include "WsServerHandler.hpp"
 #include "Task.hpp"
 #include "WebSocketOptions.hpp"
 
@@ -20,11 +21,10 @@
 #include <itlib/make_ptr.hpp>
 #include <itlib/shared_from.hpp>
 
-#include <iostream>
-#include <charconv>
-#include <unordered_map>
-
 #include <furi/furi.hpp>
+
+#include <unordered_map>
+#include <cstdio>
 
 #if !defined(FISHNETS_ENABLE_SSL)
 #   define FISHNETS_ENABLE_SSL 1
@@ -127,14 +127,8 @@ void SslContext::useTmpDh(std::string tmpDh) {
 void SslContext::useTmpDhFile(std::string tmpDhFile) {
     m_impl->ctx.use_tmp_dh_file(tmpDhFile);
 }
-bool SslContext::addCertificateAuthority(std::string ca) {
-    beast::error_code ec;
-    m_impl->ctx.add_certificate_authority(m_impl->addString(ca), ec);
-    if (ec) {
-        std::cerr << "Could not load custom certificates: " << ec.message() << '\n';
-        return false;
-    }
-    return true;
+void SslContext::addCertificateAuthority(std::string ca) {
+    m_impl->ctx.add_certificate_authority(m_impl->addString(ca));
 }
 
 using RawWsSsl = ws::stream<ssl::stream<tcp::socket>>;
@@ -395,75 +389,6 @@ struct ServerConnectorSsl final : public ServerConnectorT<RawWsSsl> {
 };
 #endif
 
-struct WsServer : public itlib::enable_shared_from {
-    net::io_context& m_ctx;
-    WsServerConnectionHandlerFactory m_factory;
-
-    tcp::acceptor m_acceptor;
-
-    SslContext* m_sslCtx = nullptr;
-
-    WsServer(
-        net::io_context& ctx,
-        WsServerConnectionHandlerFactory factory,
-        const tcp::endpoint& endpoint,
-        SslContext* sslCtx
-    )
-        : m_ctx(ctx)
-        , m_factory(std::move(factory))
-        , m_acceptor(ctx, endpoint)
-        , m_sslCtx(sslCtx)
-    {}
-
-    void doAccept() {
-        m_acceptor.async_accept(
-            m_ctx.get_executor(),
-            beast::bind_front_handler(&WsServer::onAccept, shared_from(this))
-        );
-    }
-
-    void onAccept(beast::error_code e, tcp::socket socket) {
-        if (e) {
-            std::cerr << "onAccept error: " << e << '\n';
-            return;
-        }
-
-        // init session handler
-        auto ep = getEndpointInfoOf(socket);
-        if (!ep) {
-            std::cerr << "socket disconnected while accepting\n";
-            return;
-        }
-
-        auto handler = m_factory(*ep);
-
-        if (!handler) {
-            std::cout << "session declined\n";
-            doAccept();
-            return;
-        }
-
-        std::shared_ptr<ServerConnector> con;
-
-#if FISHNETS_ENABLE_SSL
-        if (m_sslCtx) {
-            con = std::make_shared<ServerConnectorSsl>(RawWsSsl(std::move(socket), m_sslCtx->impl().ctx));
-        }
-        else
-#endif
-        {
-            con = std::make_shared<ServerConnectorWs>(RawWs(std::move(socket)));
-        }
-
-        con->m_handler = std::move(handler);
-        con->setInitialOptions(handler->getInitialOptions());
-        con->accept();
-
-        // accept more sessions
-        doAccept();
-    }
-};
-
 struct ClientConnector : public BasicConnector {
     std::string m_host;
     std::string m_target;
@@ -547,7 +472,96 @@ struct ClientConnectorSsl final : public ClientConnectorT<RawWsSsl> {
 
 } // namespace
 
-void Context::wsServe(const EndpointInfo& endpoint, WsServerConnectionHandlerFactory factory, SslContext* ssl) {
+namespace impl {
+class WsServer : public itlib::enable_shared_from {
+public:
+    net::io_context& m_ctx;
+    WsServerHandlerPtr m_handler;
+
+    tcp::acceptor m_acceptor;
+
+    SslContext* m_sslCtx = nullptr;
+
+    WsServer(
+        net::io_context& ctx,
+        const WsServerHandlerPtr& handler,
+        const tcp::endpoint& endpoint,
+        SslContext* sslCtx
+    )
+        : m_ctx(ctx)
+        , m_handler(handler)
+        , m_acceptor(ctx, endpoint)
+        , m_sslCtx(sslCtx)
+    {}
+
+    void doAccept() {
+        m_acceptor.async_accept(
+            m_ctx.get_executor(),
+            beast::bind_front_handler(&WsServer::onAccept, shared_from(this))
+        );
+    }
+
+    void onAccept(beast::error_code e, tcp::socket socket) {
+        if (e) {
+            m_handler->m_server = {};
+            m_handler->onError(e.message());
+            return;
+        }
+
+        // init session handler
+        auto ep = getEndpointInfoOf(socket);
+        if (!ep) {
+            m_handler->onError("socket disconnected while accepting");
+            doAccept();
+            return;
+        }
+
+        auto conHandler = m_handler->onAccept(*ep);
+
+        if (!conHandler) {
+            m_handler->onError("session declined");
+            doAccept();
+            return;
+        }
+
+        std::shared_ptr<ServerConnector> con;
+
+#if FISHNETS_ENABLE_SSL
+        if (m_sslCtx) {
+            con = std::make_shared<ServerConnectorSsl>(RawWsSsl(std::move(socket), m_sslCtx->impl().ctx));
+        }
+        else
+#endif
+        {
+            con = std::make_shared<ServerConnectorWs>(RawWs(std::move(socket)));
+        }
+
+        con->setInitialOptions(conHandler->getInitialOptions());
+        con->m_handler = std::move(conHandler);
+        con->accept();
+
+        // accept more sessions
+        doAccept();
+    }
+};
+
+} // namespace impl
+
+WsServerHandler::~WsServerHandler() = default;
+
+void WsServerHandler::onError(std::string msg) {
+    fprintf(stderr, "WebSocket connection error: %s\n", msg.c_str());
+}
+
+void WsServerHandler::stop() {
+    if (!m_server) return;
+    net::post(m_server->m_acceptor.get_executor(), [server = m_server]() {
+        server->m_acceptor.close();
+    });
+    m_server = {};
+}
+
+void Context::wsServe(const EndpointInfo& endpoint, WsServerHandlerPtr handler, SslContext* ssl) {
     auto ep = [&] {
         if (endpoint.address == IPv4) {
             return tcp::endpoint(tcp::v4(), endpoint.port);
@@ -560,7 +574,14 @@ void Context::wsServe(const EndpointInfo& endpoint, WsServerConnectionHandlerFac
         }
     }();
 
-    auto server = std::make_shared<WsServer>(m_impl->ctx, std::move(factory), ep, ssl);
+    if (handler->m_server) {
+        handler->onError("handler already serving");
+        return;
+    }
+
+    auto server = std::make_shared<impl::WsServer>(m_impl->ctx, handler, ep, ssl);
+    handler->m_server = server;
+
     server->doAccept();
 }
 

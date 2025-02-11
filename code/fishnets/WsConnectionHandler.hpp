@@ -20,7 +20,7 @@ public:
 
     virtual void onConnected(WebSocketPtr ws, std::string_view target) = 0;
 
-    // the default implementation logs to std::cerr
+    // the default implementation logs to stderr
     virtual void onConnectionError(std::string message);
 
     // default implementation returns default options

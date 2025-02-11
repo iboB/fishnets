@@ -15,6 +15,8 @@ public:
     SslContext(const SslContext&) = delete;
     SslContext& operator=(const SslContext&) = delete;
 
+    // the functions throw std::exception on error
+
     // strings or files in pem format
 
     void useCertificateChain(std::string certificate);
@@ -27,7 +29,7 @@ public:
     void useTmpDhFile(std::string tmpDhFile);
 
     // return false on error
-    bool addCertificateAuthority(std::string ca);
+    void addCertificateAuthority(std::string ca);
 
     // not supported yet
     // void enableNativeCertificateSupport();

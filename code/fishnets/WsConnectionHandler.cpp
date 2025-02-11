@@ -3,14 +3,14 @@
 //
 #include "WsConnectionHandler.hpp"
 #include "WebSocketOptions.hpp"
-#include <iostream>
+#include <cstdio>
 
 namespace fishnets {
 
 WsConnectionHandler::~WsConnectionHandler() = default;
 
 void WsConnectionHandler::onConnectionError(std::string message) {
-    std::cerr << "WebSocket connection error: " << message << std::endl;
+    fprintf(stderr, "WebSocket connection error: %s\n", message.c_str());
 }
 
 WebSocketOptions WsConnectionHandler::getInitialOptions() {

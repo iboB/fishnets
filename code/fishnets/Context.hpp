@@ -3,13 +3,13 @@
 //
 #pragma once
 #include "API.h"
-#include "WsServerConnectionHandlerFactory.hpp"
 #include "EndpointInfo.hpp"
+#include "WsServerHandlerPtr.hpp"
+#include "WsConnectionHandlerPtr.hpp"
 
 namespace fishnets {
 
 class SslContext;
-class WsServerHandler;
 class ContextWorkGuard;
 
 class FISHNETS_API Context {
@@ -23,7 +23,7 @@ public:
     // block the current thread until the context is stopped
     void run();
 
-    // force stop the context (diregarding pending work, including work guards)
+    // force stop the context (disregarding pending work, including work guards)
     void stop();
 
     bool stopped() const;
@@ -34,7 +34,7 @@ public:
 
     void wsServe(
         const EndpointInfo& endpoint,
-        WsServerConnectionHandlerFactory factory,
+        WsServerHandlerPtr handler,
         SslContext* sslCtx = nullptr
     );
 

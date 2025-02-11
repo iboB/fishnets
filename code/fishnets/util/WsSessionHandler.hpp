@@ -62,7 +62,7 @@ protected:
     // no io callbacks (wsReceived*, wsCompletedSend) will be called after this (calling wsReceive and wsSend is safe)
     // wsio tasks and timers will still be executed and new ones can still be posted after this
     // note that this cannot be called unless there are io ops in progress or wsClose has been called
-    // the default implementation logs to std::cout
+    // the default implementation logs to stdout
     virtual void wsClosed(std::string reason);
 
     // call to check if the session is open
