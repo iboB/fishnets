@@ -2,7 +2,6 @@
 # SPDX-License-Identifier: MIT
 #
 icm_add_lib(fishnets FISHNETS
-    FishnetsImpl.cpp
     AsioImpl.cpp
     WsConnectionHandler.cpp
 

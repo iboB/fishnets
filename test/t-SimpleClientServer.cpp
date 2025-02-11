@@ -202,42 +202,13 @@ TEST_CASE("connect") {
     CHECK(s->sendIndex == packets.size());
     CHECK(s->receivedIndex == packets.size());
 }
-//
-//TEST_CASE("connect target")
-//{
-//    SessionTargetFixture f("/xyz");
-//
-//    fishnets::WebSocketServer server(Make_ServerSession, Test_Port, 1, testServerSSLSettings.get());
-//
-//    TestClient client;
-//    REQUIRE(client.session);
-//    CHECK(client.session->sendIndex == packets.size());
-//    CHECK(client.session->receivedIndex == packets.size());
-//}
-//
-//fishnets::WebSocketSessionPtr Deny_ServerSession(const fishnets::WebSocketEndpointInfo& info)
-//{
-//    CHECK(info.address == "127.0.0.1");
-//    return {};
-//}
-//
-//TEST_CASE("server decline")
-//{
-//    fishnets::WebSocketServer server(Deny_ServerSession, Test_Port, 1, testServerSSLSettings.get());
-//
-//    TestClient client;
-//    REQUIRE(client.session);
-//    CHECK(client.session->sendIndex == 0);
-//    CHECK(client.session->receivedIndex == 0);
-//}
-//
-//TEST_CASE("client decline")
-//{
-//    // nothing special to check here
-//    // just that a client which declines sessions executes correctly without blocking or crashing
-//    fishnets::WebSocketServer server(Make_ServerSession, Test_Port, 1, testServerSSLSettings.get());
-//    fishnets::WebSocketClient client(
-//        [](const fishnets::WebSocketEndpointInfo&) { return fishnets::WebSocketSessionPtr{}; },
-//        testClientSSLSettings.get());
-//    client.connect("localhost", Test_Port);
-//}
+
+TEST_CASE("connect target") {
+    SessionTargetFixture f("/xyz");
+
+    TestServer server;
+    auto s = runTestClient();
+    REQUIRE(s);
+    CHECK(s->sendIndex == packets.size());
+    CHECK(s->receivedIndex == packets.size());
+}
