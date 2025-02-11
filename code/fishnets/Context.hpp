@@ -6,6 +6,7 @@
 #include "EndpointInfo.hpp"
 #include "WsServerHandlerPtr.hpp"
 #include "WsConnectionHandlerPtr.hpp"
+#include "ExecutorPtr.hpp"
 
 namespace fishnets {
 
@@ -31,6 +32,8 @@ public:
     void restart();
 
     ContextWorkGuard makeWorkGuard();
+
+    ExecutorPtr makeExecutor();
 
     void wsServe(
         const EndpointInfo& endpoint,
