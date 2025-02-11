@@ -39,14 +39,11 @@ class OneshotSession final : public fishnets::WsSessionHandler {
 int main() {
     fishnets::Context ctx;
     fishnets::SslContext ssl;
-    for (auto& cert : rootCertificates) {
-        ssl.addCertificateAuthority(cert);
-    }
 
     ctx.wsConnect(
         std::make_shared<OneshotSession>(),
-        //"wss://echo.websocket.org",
-        "ws://localhost:7654",
+        "wss://echo.websocket.org",
+        //"ws://localhost:7654",
         &ssl
     );
 

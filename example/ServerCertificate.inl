@@ -62,7 +62,7 @@ namespace
         "pVOUFq5mW8p0zbtfHbjkgxyF\n"
         "-----END PRIVATE KEY-----\n";
 
-    const std::string tmpDH =
+    const std::string tmpDh =
         "-----BEGIN DH PARAMETERS-----\n"
         "MIIBCAKCAQEArzQc5mpm0Fs8yahDeySj31JZlwEphUdZ9StM2D8+Fo7TMduGtSi+\n"
         "/HRWVwHcTFAgrxVdm+dl474mOUqqaz4MpzIb6+6OVfWHbQJmXPepZKyu4LgUPvY/\n"

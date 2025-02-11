@@ -21,6 +21,6 @@ const std::unique_ptr<fishnets::WebSocketServerSSLSettings> testServerSSLSetting
         std::string(),
         privateKey,
         std::string(),
-        tmpDH,
+        tmpDh,
         std::string()
     });
