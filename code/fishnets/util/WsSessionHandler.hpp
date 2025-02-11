@@ -96,6 +96,7 @@ private:
     WebSocketPtr m_ws;
     ExecutorPtr m_executor;
 
+    // helper for the contract of not calling op callbacks after wsClosed
     struct CloseStatus {
         std::optional<std::string> reason;
 

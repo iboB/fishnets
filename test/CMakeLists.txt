@@ -3,7 +3,7 @@
 #
 CPMAddPackage(gh:iboB/doctest-util@0.1.2)
 
-if(finshentsHaveSsl)
+if(fishnetsHaveSsl)
     add_library(fishnets-TestSslCtx STATIC TestSslCtx.cpp)
     target_link_libraries(fishnets-TestSslCtx PUBLIC fishnets::fishnets)
     macro(ssl_test test)

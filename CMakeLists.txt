@@ -28,7 +28,7 @@ include(icm_option)
 #######################################
 # options
 
-option(FISHNETS_STATIC "fishnets: build as static lib" OFF)
+option(BUILD_SHARED_LIBS "fishnets: build shared libraries" ON)
 option(FISHNETS_BUILD_TESTS "fishnets: build tests" ${ICM_DEV_MODE})
 option(FISHNETS_BUILD_EXAMPLES "fishnets: build examples" ${ICM_DEV_MODE})
 icm_auto_option(FISHNETS_SSL "fisnets: add ssl and secure websocket support" AUTO)
@@ -46,7 +46,7 @@ find_package(Threads REQUIRED)
 set(fishnetsHaveSsl FALSE)
 if(FISHNETS_SSL)
     find_package(OpenSSL ${FISHNETS_SSL_REQUIRED})
-    set(fishnetsHaveSsl TRUE)
+    set(fishnetsHaveSsl ${OpenSSL_FOUND})
 endif()
 
 if(NOT TARGET Boost::boost)
