@@ -4,7 +4,6 @@
 #include "WsSessionHandler.hpp"
 #include "../EndpointInfo.hpp"
 #include "../Post.hpp"
-#include "../Timer.hpp"
 #include <itlib/throw_ex.hpp>
 #include <cstdio>
 
@@ -17,16 +16,6 @@ WsSessionHandler::~WsSessionHandler() = default;
 
 void WsSessionHandler::postWsIoTask(Task task) {
     Executor_post(m_executor, std::move(task));
-}
-
-void WsSessionHandler::wsStartTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) {
-    Executor_startTimer(m_executor, id, timeFromNow, std::move(cb));
-}
-void WsSessionHandler::wsCancelTimer(uint64_t id) {
-    Executor_cancelTimer(m_executor, id);
-}
-void WsSessionHandler::wsCancelAllTimers() {
-    Executor_cancelAllTimers(m_executor);
 }
 
 bool WsSessionHandler::wsIsOpen() const {

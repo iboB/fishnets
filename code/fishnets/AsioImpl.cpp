@@ -139,7 +139,6 @@ using RawWsSsl = ws::stream<ssl::stream<tcp::socket>>;
 class Executor {
 public:
     net::any_io_executor ex;
-    std::unordered_map<uint64_t, net::steady_timer> timers;
 };
 
 WebSocket::WebSocket() = default;
@@ -171,8 +170,8 @@ template <typename RawSocket>
 struct WebSocketImplT final : public WebSocketImpl {
     RawSocket m_ws;
 
-    WebSocketImplT(RawSocket&& ws) : m_ws(std::move(ws)) {
-        m_executor = itlib::make_shared(Executor{m_ws.get_executor(), {}});
+    explicit WebSocketImplT(RawSocket&& ws) : m_ws(std::move(ws)) {
+        m_executor = itlib::make_shared(Executor{m_ws.get_executor()});
     }
 
 
@@ -296,7 +295,7 @@ template <typename RawSocket>
 struct ServerConnectorT : public ServerConnector {
     RawSocket m_ws;
 
-    ServerConnectorT(RawSocket&& ws)
+    explicit ServerConnectorT(RawSocket&& ws)
         : m_ws(std::move(ws))
     {}
 
@@ -378,7 +377,7 @@ template <typename RawSocket>
 struct ClientConnectorT : public ClientConnector {
     RawSocket m_ws;
 
-    ClientConnectorT(RawSocket&& ws) : m_ws(std::move(ws)) {}
+    explicit ClientConnectorT(RawSocket&& ws) : m_ws(std::move(ws)) {}
 
     void doConnect() override final {
         async_connect(beast::get_lowest_layer(m_ws), m_endpoints,
@@ -662,42 +661,42 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
 }
 
 ExecutorPtr Context::makeExecutor() {
-    return itlib::make_shared(Executor{net::make_strand(m_impl->ctx), {}});
+    return itlib::make_shared(Executor{net::make_strand(m_impl->ctx)});
 }
 
 void Executor_post(Executor& e, Task task) {
     post(e.ex, std::move(task));
 }
 
-void Executor_startTimer(Executor& ex, uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) {
-    auto& timer = [&]() -> net::steady_timer& {
-        auto [it, _] = ex.timers.try_emplace(id, ex.ex);
-        return it->second;
-    }();
-    timer.expires_after(timeFromNow);
-    timer.async_wait([id, cb = std::move(cb)](beast::error_code e) {
-        if (e == net::error::operation_aborted) {
-            cb(id, true);
-        }
-        else {
-            cb(id, false);
-        }
-    });
-}
+Timer::Timer() = default;
+Timer::~Timer() = default; // export vtable
 
-void Executor_cancelTimer(Executor& ex, uint64_t id) {
-    auto it = ex.timers.find(id);
-    if (it != ex.timers.end()) {
-        it->second.cancel();
-        ex.timers.erase(it);
-    }
-}
+struct TimerImpl final : public Timer {
+public:
+    net::steady_timer m_timer;
 
-void Executor_cancelAllTimers(Executor& ex) {
-    for (auto& t : ex.timers) {
-        t.second.cancel();
+    explicit TimerImpl(Executor& ex) : m_timer(ex.ex) {}
+
+    virtual void expireAfter(std::chrono::milliseconds timeFromNow) override {
+        m_timer.expires_after(timeFromNow);
     }
-    ex.timers.clear();
+
+    virtual void cancel() override {
+        m_timer.cancel();
+    }
+    virtual void cancelOne() override {
+        m_timer.cancel_one();
+    }
+
+    virtual void addCallback(Cb cb) override {
+        m_timer.async_wait([cb = std::move(cb)](beast::error_code e) {
+            cb(e == net::error::operation_aborted);
+        });
+    }
+};
+
+TimerPtr Timer::create(const ExecutorPtr& ex) {
+    return std::make_unique<TimerImpl>(*ex);
 }
 
 } // namespace fishnets

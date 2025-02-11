@@ -10,7 +10,7 @@
 
 #include <itlib/shared_from.hpp>
 #include <string_view>
-#include <chrono>
+#include <optional>
 
 namespace fishnets {
 
@@ -43,13 +43,6 @@ protected:
     WsSessionHandler();
     // intentionally not virtual. Objects are not owned through this, but instead through shared pointers
     ~WsSessionHandler();
-
-    // timer interface
-    // AGAIN: THIS IS ONLY VALID ON THE IO THREAD (from a posted task or io callback)
-    // extends the lifetime of the session handler until the callback is called
-    void wsStartTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb);
-    void wsCancelTimer(uint64_t id);
-    void wsCancelAllTimers();
 
     // called on connection errors before wsOpened
     // once wsOpened is called this can never get called, instead wsClosed will be called
