@@ -529,11 +529,12 @@ void WsServerHandler::onError(std::string msg) {
 }
 
 void WsServerHandler::stop() {
-    if (!m_server) return;
-    net::post(m_server->m_acceptor.get_executor(), [server = m_server]() {
+    auto server = m_server.lock();
+    if (!server) return;
+    net::post(server->m_acceptor.get_executor(), [server]() {
         server->m_acceptor.close();
     });
-    m_server = {};
+    server = {};
 }
 
 void Context::wsServe(const EndpointInfo& endpoint, WsServerHandlerPtr handler, SslContext* ssl) {
@@ -549,7 +550,7 @@ void Context::wsServe(const EndpointInfo& endpoint, WsServerHandlerPtr handler, 
         }
     }();
 
-    if (handler->m_server) {
+    if (!handler->m_server.expired()) {
         handler->onError("handler already serving");
         return;
     }

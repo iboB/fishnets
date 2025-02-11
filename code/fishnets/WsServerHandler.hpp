@@ -29,7 +29,7 @@ public:
 private:
     friend class Context;
     friend class impl::WsServer;
-    std::shared_ptr<impl::WsServer> m_server;
+    std::weak_ptr<impl::WsServer> m_server;
 };
 
 class SimpleServerHandler : public WsServerHandler {
