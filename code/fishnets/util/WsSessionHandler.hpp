@@ -88,10 +88,10 @@ protected:
     void wsSetOptions(const WebSocketOptions& options);
 
 private:
-    virtual void onConnected(WebSocket ws, std::string_view target) final override;
+    virtual void onConnected(WebSocketPtr ws, std::string_view target) final override;
     virtual void onConnectionError(std::string message) final override;
 
-    WebSocket m_ws;
+    WebSocketPtr m_ws;
 };
 
 } // namespace fishnets

@@ -3,13 +3,13 @@
 //
 #pragma once
 #include "API.h"
+#include "WebSocketPtr.hpp"
 #include <memory>
 #include <string>
 #include <string_view>
 
 namespace fishnets {
 
-class WebSocket;
 struct WebSocketOptions;
 
 class FISHNETS_API WsConnectionHandler {
@@ -18,7 +18,7 @@ public:
     // but it helps us export the vtable
     virtual ~WsConnectionHandler();
 
-    virtual void onConnected(WebSocket ws, std::string_view target) = 0;
+    virtual void onConnected(WebSocketPtr ws, std::string_view target) = 0;
     virtual void onConnectionError(std::string message) = 0;
 
     // default implementation returns default options

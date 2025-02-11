@@ -3,7 +3,7 @@
 //
 #pragma once
 #include "API.h"
-#include "Executor.hpp"
+#include "ExecutorPtr.hpp"
 #include <itlib/ufunction.hpp>
 #include <itlib/span.hpp>
 #include <itlib/expected.hpp>
@@ -20,25 +20,23 @@ class Executor;
 
 class FISHNETS_API WebSocket {
 public:
-    struct Impl;
-    explicit WebSocket(std::unique_ptr<Impl>);
-    ~WebSocket();
+    virtual ~WebSocket();
 
-    WebSocket(WebSocket&&) noexcept;
-    WebSocket& operator=(WebSocket&&) noexcept;
+    WebSocket(const WebSocket&) = delete;
+    WebSocket& operator=(const WebSocket&) = delete;
 
     // post a task to be executed after a timeout
     // the callback will be called with the id of the timer and whether it was cancelled
     // the associated task will extend the lifetime of the handler until the callback is called
     // starting a timer with a given id will cancel any previous timer with the same id
     using TimerCb = itlib::ufunction<void(uint64_t id, bool cancelled)>;
-    void startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb);
+    virtual void startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) = 0;
 
     // due to the async nature of the system, after cancelling some callbacks may still be called with cancelled = false
-    void cancelTimer(uint64_t id);
-    void cancelAllTimers();
+    virtual void cancelTimer(uint64_t id) = 0;
+    virtual void cancelAllTimers() = 0;
 
-    bool connected() const;
+    virtual bool connected() const = 0;
 
     using ByteSpan = itlib::span<uint8_t>;
     using ConstByteSpan = itlib::span<const uint8_t>;
@@ -73,7 +71,7 @@ public:
     // the buffer argment of the callback is the span provided as a first argument (or a view of the internal buffer)
     // it will be resized to the size of the received data
     using RecvCb = itlib::ufunction<void(Result<Packet>)>;
-    void recv(ByteSpan span, RecvCb cb);
+    virtual void recv(ByteSpan span, RecvCb cb) = 0;
 
     // call to initiate a send
     // only a single send is supported at a time
@@ -83,23 +81,25 @@ public:
     // sending heterogeneous (text-binary) partial packets is not supported
     // the first packet in a chain determines the type, the types of the rest until complete are ignored
     using SendCb = itlib::ufunction<void(Result<void>)>;
-    void send(ConstPacket packet, SendCb cb);
+    virtual void send(ConstPacket packet, SendCb cb) = 0;
 
     // call to initiate the close of the session
     using CloseCb = itlib::ufunction<void(Result<void>)>;
-    void close(CloseCb cb);
+    virtual void close(CloseCb cb) = 0;
 
     // get the endpoint info of the connection
-    EndpointInfo getEndpointInfo() const;
+    virtual EndpointInfo getEndpointInfo() const = 0;
 
     // set options for the session
-    void setOptions(const WebSocketOptions& options);
+    virtual void setOptions(const WebSocketOptions& options) = 0;
 
-    const ExecutorPtr& executor() const;
+    const ExecutorPtr& executor() const { return m_executor; }
 private:
-    friend class WsSessionHandler;
-    WebSocket(); // only WsSessionHandler can create a null WebSocket
-    std::unique_ptr<Impl> m_impl;
+    // sealed interface
+    WebSocket();
+    friend struct WebSocketImpl;
+
+    ExecutorPtr m_executor;
 };
 
 } // namespace fishnets

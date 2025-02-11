@@ -145,18 +145,18 @@ public:
     net::any_io_executor ex;
 };
 
-struct WebSocket::Impl {
-public:
-    virtual ~Impl() = default;
+WebSocket::WebSocket() = default;
+WebSocket::~WebSocket() = default;
+
+struct WebSocketImpl : public WebSocket {
+    using WebSocket::m_executor;
 
     beast::flat_buffer m_growableBuf;
     ByteSpan m_userBuf;
 
-    ExecutorPtr m_executor;
-
     std::unordered_map<uint64_t, net::steady_timer> m_timers;
 
-    void startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) {
+    void startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) final override {
         auto& timer = [&]() -> net::steady_timer& {
             auto [it, _] = m_timers.try_emplace(id, m_executor->ex);
             return it->second;
@@ -172,7 +172,7 @@ public:
         });
     }
 
-    void cancelTimer(uint64_t id) {
+    void cancelTimer(uint64_t id) final override {
         auto it = m_timers.find(id);
         if (it != m_timers.end()) {
             it->second.cancel();
@@ -180,22 +180,12 @@ public:
         }
     }
 
-    void cancelAllTimers() {
+    void cancelAllTimers() final override {
         for (auto& t : m_timers) {
             t.second.cancel();
         }
         m_timers.clear();
     }
-
-    virtual bool connected() const = 0;
-
-    virtual void recv(ByteSpan span, RecvCb cb) = 0;
-
-    virtual void send(ConstPacket packet, SendCb cb) = 0;
-
-    virtual void close(CloseCb cb) = 0;
-
-    virtual EndpointInfo getEndpointInfo() const = 0;
 };
 
 namespace {
@@ -214,7 +204,7 @@ std::optional<EndpointInfo> getEndpointInfoOf(const Socket& s) {
 }
 
 template <typename RawSocket>
-struct WebSocketImplT final : public WebSocket::Impl {
+struct WebSocketImplT final : public WebSocketImpl {
     RawSocket m_ws;
 
     WebSocketImplT(RawSocket&& ws) : m_ws(std::move(ws)) {
@@ -290,7 +280,7 @@ struct WebSocketImplT final : public WebSocket::Impl {
         return getEndpointInfoOf(m_ws).value_or(EndpointInfo{});
     }
 
-    void setOptions(WebSocketOptions opts) {
+    void setOptions(const WebSocketOptions& opts) override {
         // ignore hostId, as it's only applicable when connecting
 
         if (opts.maxIncomingMessageSize) {
@@ -371,7 +361,7 @@ struct ServerConnectorT : public ServerConnector {
     void onConnectionEstablished(beast::error_code e) {
         if (e) return failed(e, "accept");
         m_handler->onConnected(
-            WebSocket(std::make_unique<WebSocketImplT<RawSocket>>(std::move(m_ws))),
+            std::make_unique<WebSocketImplT<RawSocket>>(std::move(m_ws)),
             m_upgradeRequest.target()
         );
     }
@@ -524,7 +514,7 @@ struct ClientConnectorT : public ClientConnector {
     void onConnectionEstablished(beast::error_code e) {
         if (e) return failed(e, "establish");
         m_handler->onConnected(
-            WebSocket(std::make_unique<WebSocketImplT<RawSocket>>(std::move(m_ws))),
+            std::make_unique<WebSocketImplT<RawSocket>>(std::move(m_ws)),
             m_target
         );
     }
@@ -666,23 +656,6 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
         }
     );
 }
-
-WebSocket::WebSocket() = default;
-WebSocket::WebSocket(std::unique_ptr<Impl> impl) : m_impl(std::move(impl)) {}
-WebSocket::~WebSocket() = default;
-WebSocket::WebSocket(WebSocket&&) noexcept = default;
-WebSocket& WebSocket::operator=(WebSocket&&) noexcept = default;
-void WebSocket::startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) {
-    m_impl->startTimer(id, timeFromNow, std::move(cb));
-}
-void WebSocket::cancelTimer(uint64_t id) { m_impl->cancelTimer(id); }
-void WebSocket::cancelAllTimers() { m_impl->cancelAllTimers(); }
-bool WebSocket::connected() const { return m_impl->connected(); }
-void WebSocket::recv(ByteSpan span, RecvCb cb) { m_impl->recv(span, std::move(cb)); }
-void WebSocket::send(ConstPacket packet, SendCb cb) { m_impl->send(packet, std::move(cb)); }
-void WebSocket::close(CloseCb cb) { m_impl->close(std::move(cb)); }
-EndpointInfo WebSocket::getEndpointInfo() const { return m_impl->getEndpointInfo(); }
-const ExecutorPtr& WebSocket::executor() const { return m_impl->m_executor; }
 
 void post(Executor& e, Task task) {
     net::post(e.ex, std::move(task));

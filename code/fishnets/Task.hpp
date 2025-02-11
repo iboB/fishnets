@@ -3,7 +3,7 @@
 //
 #pragma once
 #include "API.h"
-#include "Executor.hpp"
+#include "ExecutorPtr.hpp"
 #include <itlib/ufunction.hpp>
 
 namespace fishnets {
