@@ -9,7 +9,6 @@
 #include <itlib/expected.hpp>
 #include <memory>
 #include <string>
-#include <chrono>
 
 namespace fishnets {
 
@@ -24,17 +23,6 @@ public:
 
     WebSocket(const WebSocket&) = delete;
     WebSocket& operator=(const WebSocket&) = delete;
-
-    // post a task to be executed after a timeout
-    // the callback will be called with the id of the timer and whether it was cancelled
-    // the associated task will extend the lifetime of the handler until the callback is called
-    // starting a timer with a given id will cancel any previous timer with the same id
-    using TimerCb = itlib::ufunction<void(uint64_t id, bool cancelled)>;
-    virtual void startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) = 0;
-
-    // due to the async nature of the system, after cancelling some callbacks may still be called with cancelled = false
-    virtual void cancelTimer(uint64_t id) = 0;
-    virtual void cancelAllTimers() = 0;
 
     virtual bool connected() const = 0;
 

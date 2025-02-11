@@ -6,7 +6,8 @@
 #include "WebSocket.hpp"
 #include "WsConnectionHandler.hpp"
 #include "WsServerHandler.hpp"
-#include "Task.hpp"
+#include "Post.hpp"
+#include "Timer.hpp"
 #include "WebSocketOptions.hpp"
 
 #define BOOST_BEAST_USE_STD_STRING_VIEW 1
@@ -137,6 +138,7 @@ using RawWsSsl = ws::stream<ssl::stream<tcp::socket>>;
 class Executor {
 public:
     net::any_io_executor ex;
+    std::unordered_map<uint64_t, net::steady_timer> timers;
 };
 
 WebSocket::WebSocket() = default;
@@ -147,39 +149,6 @@ struct WebSocketImpl : public WebSocket {
 
     beast::flat_buffer m_growableBuf;
     ByteSpan m_userBuf;
-
-    std::unordered_map<uint64_t, net::steady_timer> m_timers;
-
-    void startTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) final override {
-        auto& timer = [&]() -> net::steady_timer& {
-            auto [it, _] = m_timers.try_emplace(id, m_executor->ex);
-            return it->second;
-        }();
-        timer.expires_after(timeFromNow);
-        timer.async_wait([this, id, cb = std::move(cb)](beast::error_code e) {
-            if (e == net::error::operation_aborted) {
-                cb(id, true);
-            }
-            else {
-                cb(id, false);
-            }
-        });
-    }
-
-    void cancelTimer(uint64_t id) final override {
-        auto it = m_timers.find(id);
-        if (it != m_timers.end()) {
-            it->second.cancel();
-            m_timers.erase(it);
-        }
-    }
-
-    void cancelAllTimers() final override {
-        for (auto& t : m_timers) {
-            t.second.cancel();
-        }
-        m_timers.clear();
-    }
 };
 
 namespace {
@@ -691,8 +660,39 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
     );
 }
 
-void post(Executor& e, Task task) {
-    net::post(e.ex, std::move(task));
+void Executor_post(Executor& e, Task task) {
+    post(e.ex, std::move(task));
+}
+
+void Executor_startTimer(Executor& ex, uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) {
+    auto& timer = [&]() -> net::steady_timer& {
+        auto [it, _] = ex.timers.try_emplace(id, ex.ex);
+        return it->second;
+    }();
+    timer.expires_after(timeFromNow);
+    timer.async_wait([id, cb = std::move(cb)](beast::error_code e) {
+        if (e == net::error::operation_aborted) {
+            cb(id, true);
+        }
+        else {
+            cb(id, false);
+        }
+    });
+}
+
+void Executor_cancelTimer(Executor& ex, uint64_t id) {
+    auto it = ex.timers.find(id);
+    if (it != ex.timers.end()) {
+        it->second.cancel();
+        ex.timers.erase(it);
+    }
+}
+
+void Executor_cancelAllTimers(Executor& ex) {
+    for (auto& t : ex.timers) {
+        t.second.cancel();
+    }
+    ex.timers.clear();
 }
 
 } // namespace fishnets

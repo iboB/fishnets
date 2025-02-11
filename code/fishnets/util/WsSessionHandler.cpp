@@ -3,6 +3,8 @@
 //
 #include "WsSessionHandler.hpp"
 #include "../EndpointInfo.hpp"
+#include "../Post.hpp"
+#include "../Timer.hpp"
 #include <itlib/throw_ex.hpp>
 #include <cstdio>
 
@@ -14,17 +16,17 @@ WsSessionHandler::WsSessionHandler() = default;
 WsSessionHandler::~WsSessionHandler() = default;
 
 void WsSessionHandler::postWsIoTask(Task task) {
-    post(m_ws->executor(), std::move(task));
+    Executor_post(m_executor, std::move(task));
 }
 
-void WsSessionHandler::wsStartTimer(uint64_t id, std::chrono::milliseconds timeFromNow, WebSocket::TimerCb cb) {
-    m_ws->startTimer(id, timeFromNow, std::move(cb));
+void WsSessionHandler::wsStartTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb) {
+    Executor_startTimer(m_executor, id, timeFromNow, std::move(cb));
 }
 void WsSessionHandler::wsCancelTimer(uint64_t id) {
-    m_ws->cancelTimer(id);
+    Executor_cancelTimer(m_executor, id);
 }
 void WsSessionHandler::wsCancelAllTimers() {
-    m_ws->cancelAllTimers();
+    Executor_cancelAllTimers(m_executor);
 }
 
 bool WsSessionHandler::wsIsOpen() const {
@@ -40,6 +42,7 @@ void WsSessionHandler::tryCallWsClosed() {
     if (m_closeStatus.close == CloseStatus::active) return;
 
     // no active async ops
+    m_ws.reset();
     wsClosed(std::move(*m_closeStatus.reason));
 }
 
@@ -131,6 +134,7 @@ void WsSessionHandler::wsSetOptions(const WebSocketOptions& options) {
 
 void WsSessionHandler::onConnected(WebSocketPtr ws, std::string_view target) {
     m_ws = std::move(ws);
+    m_executor = m_ws->executor();
     wsOpened(target);
 }
 

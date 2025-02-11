@@ -6,9 +6,11 @@
 #include "../WebSocket.hpp"
 #include "../WsConnectionHandler.hpp"
 #include "../Task.hpp"
+#include "../TimerCb.hpp"
 
 #include <itlib/shared_from.hpp>
 #include <string_view>
+#include <chrono>
 
 namespace fishnets {
 
@@ -35,6 +37,8 @@ public:
     // thus capturing [this] or members by ref, when posting from a handler, is safe
     void postWsIoTask(Task task);
 
+    const ExecutorPtr& wsExecutor() const { return m_executor; }
+
 protected:
     WsSessionHandler();
     // intentionally not virtual. Objects are not owned through this, but instead through shared pointers
@@ -43,7 +47,7 @@ protected:
     // timer interface
     // AGAIN: THIS IS ONLY VALID ON THE IO THREAD (from a posted task or io callback)
     // extends the lifetime of the session handler until the callback is called
-    void wsStartTimer(uint64_t id, std::chrono::milliseconds timeFromNow, WebSocket::TimerCb cb);
+    void wsStartTimer(uint64_t id, std::chrono::milliseconds timeFromNow, TimerCb cb);
     void wsCancelTimer(uint64_t id);
     void wsCancelAllTimers();
 
@@ -97,6 +101,7 @@ private:
     virtual void onConnected(WebSocketPtr ws, std::string_view target) final override;
 
     WebSocketPtr m_ws;
+    ExecutorPtr m_executor;
 
     struct CloseStatus {
         std::optional<std::string> reason;
