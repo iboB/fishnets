@@ -638,14 +638,16 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
         port = sslCtx ? "443" : "80";
     }
 
-    tcp::resolver resolver(m_impl->ctx);
-    resolver.async_resolve(authSplit.host, port,
+    auto resolver = std::make_unique<tcp::resolver>(m_impl->ctx);
+    auto presolver = resolver.get();
+    presolver->async_resolve(authSplit.host, port,
         [
             this,
             handler,
             sslCtx,
             host = std::string(authSplit.host),
-            target = std::string(uriSplit.req_path)
+            target = std::string(uriSplit.req_path),
+            pl = std::move(resolver)
         ](beast::error_code e, tcp::resolver::results_type results) mutable {
             if (e) {
                 handler->onConnectionError(std::string("resolve: ") + e.message());

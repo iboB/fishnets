@@ -73,7 +73,7 @@ protected:
 
     // call to initiate a receive
     // the lifetime of the session handler itself will be extended until the corresponding wsReceived* is called
-    void wsReceive(WebSocket::ByteSpan buf);
+    void wsReceive(WebSocket::ByteSpan buf = {});
 
     // the buffer argment of these callbacks is the span provided to wsReceive (or a view of the internal buffer)
     // it will be resized to the size of the received data
