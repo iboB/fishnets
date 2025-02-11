@@ -9,7 +9,28 @@
 #include <cstdint>
 
 namespace fishnets {
-// these functions are only valid on the executor itself
+
+class FISHNETS_API Timer {
+public:
+    virtual ~Timer();
+
+    Timer(const Timer&) = delete;
+    Timer& operator=(const Timer&) = delete;
+
+    virtual void expireAfter(std::chrono::milliseconds timeFromNow) = 0;
+
+    virtual void cancel() = 0;
+    virtual void cancelOne() = 0;
+
+    using Cb = itlib::ufunction<void(bool cancelled)>;
+    virtual void addCallback(Cb cb) = 0;
+
+private:
+    // sealed interface
+    Timer();
+    friend struct TimerImpl;
+};
+
 
 // post a task to be executed after a timeout
 // the callback will be called with the id of the timer and whether it was cancelled
