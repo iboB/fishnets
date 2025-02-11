@@ -31,10 +31,6 @@ class OneshotSession final : public fishnets::WsSessionHandler {
         wsClose();
     }
 
-    void wsClosed(std::string reason) override {
-        std::cout << "Disconnected. Reason: " << reason << '\n';
-    }
-
     std::string m_msg;
 };
 

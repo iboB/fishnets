@@ -4,6 +4,7 @@
 #include "WsSessionHandler.hpp"
 #include "../EndpointInfo.hpp"
 #include <itlib/throw_ex.hpp>
+#include <iostream>
 
 namespace fishnets {
 
@@ -134,9 +135,10 @@ void WsSessionHandler::onConnected(WebSocketPtr ws, std::string_view target) {
 }
 
 // default implementations
-void WsSessionHandler::onConnectionError(std::string) {}
 void WsSessionHandler::wsOpened(std::string_view) {}
-void WsSessionHandler::wsClosed(std::string) {}
+void WsSessionHandler::wsClosed(std::string msg) {
+    std::cout << "WebSocket disconnected: " << msg << '\n';
+}
 void WsSessionHandler::wsReceivedBinary(itlib::span<uint8_t>, bool) {}
 void WsSessionHandler::wsReceivedText(itlib::span<char>, bool) {}
 void WsSessionHandler::wsCompletedSend() {}

@@ -50,7 +50,7 @@ protected:
     // called on connection errors before wsOpened
     // once wsOpened is called this can never get called, instead wsClosed will be called
     // this comes from WsConnectionHandler and you can override it if you want to handle connection errors
-    virtual void onConnectionError(std::string message) override;
+    // virtual void onConnectionError(std::string message) override;
 
     // entrypoint
     // called when socked connection is established
@@ -62,6 +62,7 @@ protected:
     // no io callbacks (wsReceived*, wsCompletedSend) will be called after this (calling wsReceive and wsSend is safe)
     // wsio tasks and timers will still be executed and new ones can still be posted after this
     // note that this cannot be called unless there are io ops in progress or wsClose has been called
+    // the default implementation logs to std::cout
     virtual void wsClosed(std::string reason);
 
     // call to check if the session is open

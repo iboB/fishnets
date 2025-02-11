@@ -19,7 +19,9 @@ public:
     virtual ~WsConnectionHandler();
 
     virtual void onConnected(WebSocketPtr ws, std::string_view target) = 0;
-    virtual void onConnectionError(std::string message) = 0;
+
+    // the default implementation logs to std::cerr
+    virtual void onConnectionError(std::string message);
 
     // default implementation returns default options
     virtual WebSocketOptions getInitialOptions();
