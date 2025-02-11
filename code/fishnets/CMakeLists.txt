@@ -5,6 +5,8 @@ icm_add_lib(fishnets FISHNETS
     FishnetsImpl.cpp
     AsioImpl.cpp
     WsConnectionHandler.cpp
+
+    util/WsSessionHandler.cpp
 )
 add_library(fishnets::fishnets ALIAS fishnets)
 

@@ -26,7 +26,7 @@ public:
     // no calls to the interface are allowed in this function, not even postSessionIoTask
     // the default implementation returns default-constructed WebSocketOptions
     // this comes from WsConnectionHandler and you can override it if you want to provide custom initial options
-    // virtual WebSocketOptions getInitialOptions();
+    // virtual WebSocketOptions getInitialOptions() override;
 
     // post a task to be executed on the io strand of the session
     // THIS IS THE ONLY FUNCTION WHICH IS VALID ON ANY THREAD
@@ -47,6 +47,11 @@ protected:
     void wsCancelTimer(uint64_t id);
     void wsCancelAllTimers();
 
+    // called on connection errors before wsOpened
+    // once wsOpened is called this can never get called, instead wsClosed will be called
+    // this comes from WsConnectionHandler and you can override it if you want to handle connection errors
+    virtual void onConnectionError(std::string message) override;
+
     // entrypoint
     // called when socked connection is established
     // with the target of the request which initiated the session
@@ -57,7 +62,7 @@ protected:
     // no io callbacks (wsReceived*, wsCompletedSend) will be called after this (calling wsReceive and wsSend is safe)
     // wsio tasks and timers will still be executed and new ones can still be posted after this
     // note that this cannot be called unless there are io ops in progress or wsClose has been called
-    virtual void wsClosed();
+    virtual void wsClosed(std::string reason);
 
     // call to check if the session is open
     bool wsIsOpen() const;
@@ -89,9 +94,27 @@ protected:
 
 private:
     virtual void onConnected(WebSocketPtr ws, std::string_view target) final override;
-    virtual void onConnectionError(std::string message) final override;
 
     WebSocketPtr m_ws;
+
+    struct CloseStatus {
+        std::optional<std::string> reason;
+
+        bool open() const noexcept { return !reason; }
+
+        enum Type : uint8_t {
+            none,
+            active,
+            closed,
+        };
+        Type send = none;
+        Type recv = none;
+        Type close = none;
+    };
+    CloseStatus m_closeStatus;
+
+    void doSend(WebSocket::ConstPacket packet);
+    void tryCallWsClosed();
 };
 
 } // namespace fishnets
