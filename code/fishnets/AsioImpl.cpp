@@ -26,6 +26,7 @@
 
 #include <unordered_map>
 #include <cstdio>
+#include <list>
 
 #if !defined(FISHNETS_ENABLE_SSL)
 #   define FISHNETS_ENABLE_SSL 1
@@ -171,7 +172,7 @@ struct WebSocketImplT final : public WebSocketImpl {
     RawSocket m_ws;
 
     WebSocketImplT(RawSocket&& ws) : m_ws(std::move(ws)) {
-        m_executor = itlib::make_shared(Executor{m_ws.get_executor()});
+        m_executor = itlib::make_shared(Executor{m_ws.get_executor(), {}});
     }
 
 
