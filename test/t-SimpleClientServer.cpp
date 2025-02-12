@@ -163,8 +163,8 @@ struct TestServer {
     std::thread m_thread;
 
     TestServer() {
-        m_ctx.wsServe(
-            {"127.0.0.1", Test_Port},
+        m_ctx.wsServeLocalhost(
+            Test_Port,
             std::make_shared<fishnets::SimpleServerHandler>([](const fishnets::EndpointInfo& info) {
                 CHECK(info.address == "127.0.0.1");
                 return std::make_shared<TestServerSession>();

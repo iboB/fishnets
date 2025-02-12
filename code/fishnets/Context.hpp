@@ -7,6 +7,7 @@
 #include "WsServerHandlerPtr.hpp"
 #include "WsConnectionHandlerPtr.hpp"
 #include "ExecutorPtr.hpp"
+#include <itlib/span.hpp>
 
 namespace fishnets {
 
@@ -36,17 +37,37 @@ public:
     ExecutorPtr makeExecutor();
 
     void wsServe(
+        itlib::span<const EndpointInfo> endpoints,
+        WsServerHandlerPtr handler,
+        SslContext* sslCtx = nullptr
+    );
+    void wsServe(
         const EndpointInfo& endpoint,
+        WsServerHandlerPtr handler,
+        SslContext* sslCtx = nullptr
+    ) {
+        wsServe({&endpoint, 1}, std::move(handler), sslCtx);
+    }
+    void wsServeLocalhost(
+        uint16_t port,
         WsServerHandlerPtr handler,
         SslContext* sslCtx = nullptr
     );
 
     void wsConnect(
         WsConnectionHandlerPtr handler,
-        const EndpointInfo& endpoint,
+        itlib::span<const EndpointInfo> endpoints,
         std::string_view target = "/",
         SslContext* sslCtx = nullptr
     );
+    void wsConnect(
+        WsConnectionHandlerPtr handler,
+        const EndpointInfo& endpoint,
+        std::string_view target = "/",
+        SslContext* sslCtx = nullptr
+    ) {
+        wsConnect(std::move(handler), {&endpoint, 1}, target, sslCtx);
+    }
     void wsConnect(
         WsConnectionHandlerPtr handler,
         std::string_view url,

@@ -46,12 +46,13 @@ using tcp = net::ip::tcp;
 
 namespace fishnets {
 
-struct ContextWorkGuard::Impl {
-    net::executor_work_guard<net::io_context::executor_type> guard;
-};
-
 struct Context::Impl {
     net::io_context ctx;
+    void wsServe(itlib::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl);
+};
+
+struct ContextWorkGuard::Impl {
+    net::executor_work_guard<net::io_context::executor_type> guard;
 };
 
 ContextWorkGuard::ContextWorkGuard() = default;
@@ -153,6 +154,34 @@ struct WebSocketImpl : public WebSocket {
 
 namespace {
 
+tcp::endpoint EndpointInfo_toTcp(const EndpointInfo& ep) {
+    if (ep.address == IPv4) {
+        return tcp::endpoint(tcp::v4(), ep.port);
+    }
+    else if (ep.address == IPv6) {
+        return tcp::endpoint(tcp::v6(), ep.port);
+    }
+    else {
+        return tcp::endpoint(net::ip::make_address(ep.address), ep.port);
+    }
+}
+
+std::vector<tcp::endpoint> EndpointInfo_toTcp(itlib::span<const EndpointInfo> span) {
+    std::vector<tcp::endpoint> eps;
+    eps.reserve(span.size());
+    for (auto& e : span) {
+        eps.push_back(EndpointInfo_toTcp(e));
+    }
+    return eps;
+}
+
+EndpointInfo EndpointInfo_fromTcp(const tcp::endpoint& ep) {
+    EndpointInfo ret;
+    ret.address = ep.address().to_string();
+    ret.port = ep.port();
+    return ret;
+}
+
 template <typename Socket>
 std::optional<EndpointInfo> getEndpointInfoOf(const Socket& s) {
     beast::error_code err;
@@ -160,10 +189,7 @@ std::optional<EndpointInfo> getEndpointInfoOf(const Socket& s) {
     // if there's an error, the socket has likely been disconnected
     if (err) return {};
 
-    EndpointInfo ret;
-    ret.address = ep.address().to_string();
-    ret.port = ep.port();
-    return ret;
+    return EndpointInfo_fromTcp(ep);
 }
 
 template <typename RawSocket>
@@ -384,7 +410,15 @@ struct ClientConnectorT : public ClientConnector {
             beast::bind_front_handler(&ClientConnectorT::onConnect, shared_from(this)));
     }
 
-    virtual void onConnect(beast::error_code e, const tcp::endpoint& ep) = 0;
+    void onConnect(beast::error_code e, const tcp::endpoint& ep) {
+        if (e) return failed(e, "connect");
+        if (m_host.empty()) {
+            m_host = ep.address().to_string();
+        }
+        handshake();
+    }
+
+    virtual void handshake() = 0;
 
     void setInitialOptions(WebSocketOptions opts) {
         m_ws.read_message_max(opts.maxIncomingMessageSize.value_or(2 * 1024 * 1024));
@@ -422,21 +456,19 @@ struct ClientConnectorT : public ClientConnector {
 
 struct ClientConnectorWs final : public ClientConnectorT<RawWs> {
     using ClientConnectorT<RawWs>::ClientConnectorT;
-    void onConnect(beast::error_code e, const tcp::endpoint&) override {
-        onReadyForWSHandshake(e);
+    void handshake() override {
+        onReadyForWSHandshake({});
     }
 };
 
 #if FISHNETS_ENABLE_SSL
 struct ClientConnectorSsl final : public ClientConnectorT<RawWsSsl> {
     using ClientConnectorT<RawWsSsl>::ClientConnectorT;
-    void onConnect(beast::error_code e, const tcp::endpoint&) override {
-        if (e) return failed(e, "connect");
-
+    void handshake() override {
         // Set SNI Hostname (many hosts need this to handshake successfully)
         if (!SSL_set_tlsext_host_name(m_ws.next_layer().native_handle(), m_host.c_str())) {
-            e = beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category());
-            return failed(e, "connect");
+            auto e = beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category());
+            return failed(e, "ssl handshake");
         }
 
         m_ws.next_layer().async_handshake(ssl::stream_base::client,
@@ -453,30 +485,46 @@ public:
     net::io_context& m_ctx;
     WsServerHandlerPtr m_handler;
 
-    tcp::acceptor m_acceptor;
+    std::vector<tcp::acceptor> m_acceptors;
 
     SslContext* m_sslCtx = nullptr;
 
     WsServer(
         net::io_context& ctx,
         const WsServerHandlerPtr& handler,
-        const tcp::endpoint& endpoint,
+        itlib::span<const tcp::endpoint> endpoints,
         SslContext* sslCtx
     )
         : m_ctx(ctx)
         , m_handler(handler)
-        , m_acceptor(ctx, endpoint)
         , m_sslCtx(sslCtx)
-    {}
-
-    void doAccept() {
-        m_acceptor.async_accept(
-            m_ctx.get_executor(),
-            beast::bind_front_handler(&WsServer::onAccept, shared_from(this))
-        );
+    {
+        for (auto& ep : endpoints) {
+            m_acceptors.emplace_back(ctx, ep);
+        }
     }
 
-    void onAccept(beast::error_code e, tcp::socket socket) {
+    void start() {
+        for (auto& a : m_acceptors) {
+            doAccept(a);
+        }
+    }
+
+    void stop() {
+        for (auto& a : m_acceptors) {
+            net::post(a.get_executor(), [&a, pl = shared_from_this()]() {
+                a.close();
+            });
+        }
+    }
+
+    void doAccept(tcp::acceptor& a) {
+        a.async_accept(a.get_executor(), [&a, this, pl = shared_from_this()](beast::error_code e, tcp::socket socket) {
+            onAccept(a, e, std::move(socket));
+        });
+    }
+
+    void onAccept(tcp::acceptor& a, beast::error_code e, tcp::socket socket) {
         if (e) {
             m_handler->m_server = {};
             m_handler->onError(e.message());
@@ -487,7 +535,7 @@ public:
         auto ep = getEndpointInfoOf(socket);
         if (!ep) {
             m_handler->onError("socket disconnected while accepting");
-            doAccept();
+            doAccept(a);
             return;
         }
 
@@ -495,7 +543,7 @@ public:
 
         if (!conHandler) {
             m_handler->onError("session declined");
-            doAccept();
+            doAccept(a);
             return;
         }
 
@@ -516,7 +564,7 @@ public:
         con->accept();
 
         // accept more sessions
-        doAccept();
+        doAccept(a);
     }
 };
 
@@ -531,34 +579,32 @@ void WsServerHandler::onError(std::string msg) {
 void WsServerHandler::stop() {
     auto server = m_server.lock();
     if (!server) return;
-    net::post(server->m_acceptor.get_executor(), [server]() {
-        server->m_acceptor.close();
-    });
+    server->stop();
     server = {};
 }
 
-void Context::wsServe(const EndpointInfo& endpoint, WsServerHandlerPtr handler, SslContext* ssl) {
-    auto ep = [&] {
-        if (endpoint.address == IPv4) {
-            return tcp::endpoint(tcp::v4(), endpoint.port);
-        }
-        else if (endpoint.address == IPv6) {
-            return tcp::endpoint(tcp::v6(), endpoint.port);
-        }
-        else {
-            return tcp::endpoint(net::ip::make_address(endpoint.address), endpoint.port);
-        }
-    }();
-
+void Context::Impl::wsServe(itlib::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl) {
     if (!handler->m_server.expired()) {
         handler->onError("handler already serving");
         return;
     }
-
-    auto server = std::make_shared<impl::WsServer>(m_impl->ctx, handler, ep, ssl);
+    auto server = std::make_shared<impl::WsServer>(ctx, handler, eps, ssl);
     handler->m_server = server;
 
-    server->doAccept();
+    server->start();
+}
+
+void Context::wsServe(itlib::span<const EndpointInfo> endpoints, WsServerHandlerPtr handler, SslContext* ssl) {
+    auto eps = EndpointInfo_toTcp(endpoints);
+    m_impl->wsServe(eps, std::move(handler), ssl);
+}
+
+void Context::wsServeLocalhost(uint16_t port, WsServerHandlerPtr handler, SslContext* ssl) {
+    const tcp::endpoint eps[] = {
+        {tcp::v4(), port},
+        {tcp::v6(), port}
+    };
+    m_impl->wsServe(eps, std::move(handler), ssl);
 }
 
 void Context_wsConnect(
@@ -591,16 +637,24 @@ void Context_wsConnect(
 
 void Context::wsConnect(
     WsConnectionHandlerPtr handler,
-    const EndpointInfo& endpoint,
+    itlib::span<const EndpointInfo> endpoints,
     std::string_view target,
     SslContext* ssl
 ) {
+    if (endpoints.empty()) {
+        handler->onConnectionError("no endpoints provided");
+        return;
+    }
+
     if (target.empty()) target = "/";
+
+    auto eps = EndpointInfo_toTcp(endpoints);
+
     Context_wsConnect(
         *this,
         handler,
-        {tcp::endpoint(net::ip::make_address(endpoint.address), endpoint.port)},
-        endpoint.address,
+        std::move(eps),
+        {},
         std::string(target),
         ssl
     );
