@@ -48,6 +48,11 @@ if(FISHNETS_SSL)
     find_package(OpenSSL ${FISHNETS_SSL_REQUIRED})
     set(fishnetsHaveSsl ${OpenSSL_FOUND})
 endif()
+if(fishnetsHaveSsl)
+    message(STATUS "fishnets: building WITH SSL support")
+else()
+    message(STATUS "fishnets: building with NO SSL support")
+endif()
 
 if(NOT TARGET Boost::boost)
     # only add boost if not added from the outside
