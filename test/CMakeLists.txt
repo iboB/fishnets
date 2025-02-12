@@ -23,3 +23,4 @@ macro(dual_test test)
 endmacro()
 
 dual_test(SimpleClientServer)
+ssl_test(websocket.org)
