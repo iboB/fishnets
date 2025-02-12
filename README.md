@@ -2,7 +2,7 @@
 
 A client/server library for HTTP and WebSocket communication.
 
-This is a thin wrapper of Boost.Asio and Boost.Beast. The main reason for its existense it to have something which can abstract away the incredibly heavy compilation toll these libraries impose on the user. This way you compile asio/beast once and link against fishnets, which is orders of magnitude faster compile.
+This is a thin(-ish) wrapper of Boost.Asio and Boost.Beast. The main reason for its existence it to have something which can abstract away the incredibly heavy compilation toll these libraries impose on the user. This way you compile asio/beast once and link against fishnets, which is orders of magnitude faster to compile.
 
 ## Copying
 
