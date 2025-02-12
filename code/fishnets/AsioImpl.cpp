@@ -525,6 +525,8 @@ public:
     }
 
     void onAccept(tcp::acceptor& a, beast::error_code e, tcp::socket socket) {
+        auto localEndpoint = EndpointInfo_fromTcp(a.local_endpoint());
+
         if (e) {
             m_handler->m_server = {};
             m_handler->onError(e.message());
@@ -539,7 +541,7 @@ public:
             return;
         }
 
-        auto conHandler = m_handler->onAccept(*ep);
+        auto conHandler = m_handler->onAccept(localEndpoint, *ep);
 
         if (!conHandler) {
             m_handler->onError("session declined");
@@ -601,8 +603,8 @@ void Context::wsServe(itlib::span<const EndpointInfo> endpoints, WsServerHandler
 
 void Context::wsServeLocalhost(uint16_t port, WsServerHandlerPtr handler, SslContext* ssl) {
     const tcp::endpoint eps[] = {
-        {tcp::v4(), port},
-        {tcp::v6(), port}
+        {net::ip::address_v4::loopback(), port},
+        {net::ip::address_v6::loopback(), port},
     };
     m_impl->wsServe(eps, std::move(handler), ssl);
 }

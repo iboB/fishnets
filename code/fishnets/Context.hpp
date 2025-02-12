@@ -48,6 +48,8 @@ public:
     ) {
         wsServe({&endpoint, 1}, std::move(handler), sslCtx);
     }
+
+    // serve both ipv4 and ipv6 on localhost
     void wsServeLocalhost(
         uint16_t port,
         WsServerHandlerPtr handler,

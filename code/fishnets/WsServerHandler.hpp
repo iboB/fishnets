@@ -19,7 +19,7 @@ class FISHNETS_API WsServerHandler {
 public:
     virtual ~WsServerHandler();
 
-    virtual WsConnectionHandlerPtr onAccept(const EndpointInfo& ep) = 0;
+    virtual WsConnectionHandlerPtr onAccept(const EndpointInfo& local, const EndpointInfo& remote) = 0;
 
     // the default implementation logs to stderr
     virtual void onError(std::string msg);
@@ -34,13 +34,14 @@ private:
 
 class SimpleServerHandler : public WsServerHandler {
 public:
-    using ConnectionHandlerFactory = std::function<WsConnectionHandlerPtr(const EndpointInfo&)>;
+    using ConnectionHandlerFactory
+        = std::function<WsConnectionHandlerPtr(const EndpointInfo& local, const EndpointInfo& remote)>;
     ConnectionHandlerFactory factory;
 
     SimpleServerHandler(ConnectionHandlerFactory f) : factory(std::move(f)) {}
 
-    virtual WsConnectionHandlerPtr onAccept(const EndpointInfo& ep) override {
-        return factory(ep);
+    virtual WsConnectionHandlerPtr onAccept(const EndpointInfo& local, const EndpointInfo& remote) override {
+        return factory(local, remote);
     }
 };
 } // namespace fishnets

@@ -50,7 +50,7 @@ int main() {
 
     ctx.wsServe(
         {fishnets::IPv4, 7654},
-        std::make_shared<fishnets::SimpleServerHandler>([](const fishnets::EndpointInfo&) {
+        std::make_shared<fishnets::SimpleServerHandler>([](const fishnets::EndpointInfo&, const fishnets::EndpointInfo&) {
             return std::make_shared<EchoServerSession>();
         })
     );

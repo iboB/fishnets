@@ -165,8 +165,10 @@ struct TestServer {
     TestServer() {
         m_ctx.wsServeLocalhost(
             Test_Port,
-            std::make_shared<fishnets::SimpleServerHandler>([](const fishnets::EndpointInfo& info) {
-                CHECK(info.address == "127.0.0.1");
+            std::make_shared<fishnets::SimpleServerHandler>([](const fishnets::EndpointInfo& local, const fishnets::EndpointInfo remote) {
+                CHECK(local.address == "127.0.0.1");
+                CHECK(local.port == Test_Port);
+                CHECK(remote.address == "127.0.0.1");
                 return std::make_shared<TestServerSession>();
             }),
             m_sslCtx.get()
