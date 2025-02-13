@@ -30,7 +30,7 @@ public:
     using Cb = itlib::ufunction<void(const std::error_code& cancelled)>;
     virtual void addCallback(Cb cb) = 0;
 
-    TimerPtr create(const ExecutorPtr& ex);
+    static TimerPtr create(const ExecutorPtr& ex);
 private:
     // sealed interface
     Timer();
