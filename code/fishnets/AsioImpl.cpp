@@ -746,9 +746,7 @@ public:
     }
 
     virtual void addCallback(Cb cb) override {
-        m_timer.async_wait([cb = std::move(cb)](beast::error_code e) {
-            cb(e == net::error::operation_aborted);
-        });
+        m_timer.async_wait(std::move(cb));
     }
 };
 

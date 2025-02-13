@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <system_error>
 
 namespace fishnets {
 
@@ -26,7 +27,7 @@ public:
     virtual void cancel() = 0;
     virtual void cancelOne() = 0;
 
-    using Cb = itlib::ufunction<void(bool cancelled)>;
+    using Cb = itlib::ufunction<void(const std::error_code& cancelled)>;
     virtual void addCallback(Cb cb) = 0;
 
     TimerPtr create(const ExecutorPtr& ex);
