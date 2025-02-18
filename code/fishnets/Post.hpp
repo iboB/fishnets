@@ -9,9 +9,9 @@
 namespace fishnets {
 // these functions are valid on any thread
 
-FISHNETS_API void Executor_post(Executor& ex, Task task);
+FISHNETS_API void post(Executor& ex, Task task);
 
-inline void Executor_post(const ExecutorPtr& ex, Task task) {
-    Executor_post(*ex, std::move(task));
+inline void post(const ExecutorPtr& ex, Task task) {
+    post(*ex, std::move(task));
 }
 } // namespace fishnets

@@ -15,7 +15,7 @@ WsSessionHandler::WsSessionHandler() = default;
 WsSessionHandler::~WsSessionHandler() = default;
 
 void WsSessionHandler::postWsIoTask(Task task) {
-    Executor_post(m_executor, [pl = shared_from_this(), task = std::move(task)]() {
+    post(m_executor, [pl = shared_from_this(), task = std::move(task)]() {
         task();
     });
 }

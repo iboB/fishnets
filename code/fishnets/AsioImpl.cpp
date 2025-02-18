@@ -721,7 +721,7 @@ ExecutorPtr Context::makeExecutor() {
     return itlib::make_shared(Executor{net::make_strand(m_impl->ctx)});
 }
 
-void Executor_post(Executor& e, Task task) {
+void post(Executor& e, Task task) {
     post(e.ex, std::move(task));
 }
 
