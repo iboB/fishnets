@@ -519,7 +519,7 @@ public:
     }
 
     void doAccept(tcp::acceptor& a) {
-        a.async_accept(a.get_executor(), [&a, this, pl = shared_from_this()](beast::error_code e, tcp::socket socket) {
+        a.async_accept(make_strand(m_ctx), [&a, this, pl = shared_from_this()](beast::error_code e, tcp::socket socket) {
             onAccept(a, e, std::move(socket));
         });
     }
@@ -609,7 +609,7 @@ void Context::wsServeLocalhost(uint16_t port, WsServerHandlerPtr handler, SslCon
     m_impl->wsServe(eps, std::move(handler), ssl);
 }
 
-void Context_wsConnect(
+static void Context_wsConnect(
     Context& self,
     WsConnectionHandlerPtr& handler,
     std::vector<tcp::endpoint> eps,
@@ -619,14 +619,15 @@ void Context_wsConnect(
 ) {
     std::shared_ptr<ClientConnector> con;
 
+    auto strand = make_strand(self.impl().ctx);
 #if FISHNETS_ENABLE_SSL
     if (ssl) {
-        con = std::make_shared<ClientConnectorSsl>(RawWsSsl(self.impl().ctx, ssl->impl().ctx));
+        con = std::make_shared<ClientConnectorSsl>(RawWsSsl(std::move(strand), ssl->impl().ctx));
     }
     else
 #endif
     {
-        con = std::make_shared<ClientConnectorWs>(RawWs(self.impl().ctx));
+        con = std::make_shared<ClientConnectorWs>(RawWs(std::move(strand)));
     }
 
     con->m_handler = std::move(handler);
@@ -718,7 +719,7 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
 }
 
 ExecutorPtr Context::makeExecutor() {
-    return itlib::make_shared(Executor{net::make_strand(m_impl->ctx)});
+    return itlib::make_shared(Executor{make_strand(m_impl->ctx)});
 }
 
 void post(Executor& e, Task task) {

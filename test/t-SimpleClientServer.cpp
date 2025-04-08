@@ -3,16 +3,16 @@
 //
 #include <doctest/doctest.h>
 #include "TestSslCtx.hpp"
+#include "TestSeqCheck.hpp"
 
 #include <fishnets/Context.hpp>
 #include <fishnets/WsServerHandler.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
+#include <fishnets/util/ThreadRunner.hpp>
 
 #include <cstring>
 #include <deque>
 #include <optional>
-#include <thread>
-#include <mutex>
 
 constexpr uint16_t Test_Port = 7654;
 
@@ -143,11 +143,13 @@ class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSes
     using BasicSession::BasicSession;
 
     void wsOpened(std::string_view target) override {
+        m_seqCheck = makeSeqCheck(m_id % 2 == 1);
         checkOpen(target, wsGetEndpointInfo());
         wsReceive();
     }
 
     void wsReceivedBinary(std::span<uint8_t> binary, bool complete) override {
+        std::lock_guard l(*m_seqCheck);
         CHECK(complete);
         REQUIRE(receivedIndex < packets.size());
         CHECK((packets[receivedIndex] == binary));
@@ -158,6 +160,7 @@ class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSes
     }
 
     void wsReceivedText(std::span<char> text, bool complete) override {
+        std::lock_guard l(*m_seqCheck);
         CHECK(complete);
         REQUIRE(receivedIndex < packets.size());
         std::string_view str(text.data(), text.size());
@@ -179,10 +182,19 @@ class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSes
     }
 
     void wsCompletedSend() override {
+        std::lock_guard l(*m_seqCheck);
+
+        //if (m_id > 0) {
+        //    const char* role = (m_role == Role::Client) ? "client" : "server";
+        //    auto tid = std::this_thread::get_id();
+        //    printf("%s %d: %d\n", role, m_id, tid);
+        //}
+
         curSend.reset();
         send();
     }
 
+    std::unique_ptr<SeqCheckBase> m_seqCheck;
     std::deque<size_t> sendQueue;
     std::optional<size_t> curSend;
     size_t receivedIndex = 0;
@@ -192,50 +204,65 @@ template <typename SessionType>
 struct TestServer {
     fishnets::Context m_ctx;
     std::shared_ptr<fishnets::SslContext> m_sslCtx = createServerTestSslCtx();
-    std::thread m_thread;
+    fishnets::ThreadRunner m_runner;
+    uint32_t m_freeSessionId = 0;
 
-    TestServer() {
+    TestServer(size_t numThreads) {
         m_ctx.wsServeLocalhost(
             Test_Port,
-            std::make_shared<fishnets::SimpleServerHandler>([](const fishnets::EndpointInfo& local, const fishnets::EndpointInfo remote) {
+            std::make_shared<fishnets::SimpleServerHandler>([this](const fishnets::EndpointInfo& local, const fishnets::EndpointInfo remote) {
                 CHECK(local.address == "127.0.0.1");
                 CHECK(local.port == Test_Port);
                 CHECK(remote.address == "127.0.0.1");
-                return std::make_shared<SessionType>(Role::Server, 0);
+                return std::make_shared<SessionType>(Role::Server, m_freeSessionId++);
             }),
             m_sslCtx.get()
         );
-        m_thread = std::thread([this] {
-            m_ctx.run();
-        });
+        m_runner.start(m_ctx, numThreads);
     }
     ~TestServer() {
         m_ctx.stop();
-        m_thread.join();
     }
 };
 
-template <typename SessionType>
-void runTestClient() {
-    fishnets::Context ctx;
-    auto sslCtx = createClientTestSslCtx();
-    ctx.wsConnect(
-        std::make_shared<SessionType>(Role::Client, 0),
-        {"127.0.0.1", Test_Port},
-        SessionTargetFixture::target,
-        sslCtx.get()
-    );
-    ctx.run();
+struct TestClientRunParams {
+    uint32_t numSessions;
+    uint32_t numThreads;
 };
 
-TEST_CASE("connect") {
-    TestServer<TestEchoSession> server;
-    runTestClient<TestSenderSession>();
+template <typename SessionType>
+void runTestClient(TestClientRunParams params) {
+    fishnets::Context ctx;
+    auto sslCtx = createClientTestSslCtx();
+    for (uint32_t i = 0; i < params.numSessions; ++i) {
+        ctx.wsConnect(
+            std::make_shared<SessionType>(Role::Client, i),
+            {"127.0.0.1", Test_Port},
+            SessionTargetFixture::target,
+            sslCtx.get()
+        );
+    }
+    fishnets::ThreadRunner runner(ctx, params.numThreads);
+};
+
+TEST_CASE("simple connect") {
+    TestServer<TestEchoSession> server(1);
+    runTestClient<TestSenderSession>({.numSessions = 1, .numThreads = 1});
 }
 
-TEST_CASE("connect target") {
+TEST_CASE("simple connect target") {
     SessionTargetFixture f("/xyz");
 
-    TestServer<TestSenderSession> server;
-    runTestClient<TestEchoSession>();
+    TestServer<TestSenderSession> server(1);
+    runTestClient<TestEchoSession>({.numSessions = 1, .numThreads = 1});
+}
+
+TEST_CASE("server echo multi") {
+    TestServer<TestEchoSession> server(3);
+    runTestClient<TestSenderSession>({.numSessions = 6, .numThreads = 3});
+}
+
+TEST_CASE("client echo multi") {
+    TestServer<TestSenderSession> server(3);
+    runTestClient<TestEchoSession>({.numSessions = 6, .numThreads = 3});
 }
