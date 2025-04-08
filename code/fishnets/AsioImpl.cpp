@@ -48,7 +48,7 @@ namespace fishnets {
 
 struct Context::Impl {
     net::io_context ctx;
-    void wsServe(itlib::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl);
+    void wsServe(std::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl);
 };
 
 struct ContextWorkGuard::Impl {
@@ -166,7 +166,7 @@ tcp::endpoint EndpointInfo_toTcp(const EndpointInfo& ep) {
     }
 }
 
-std::vector<tcp::endpoint> EndpointInfo_toTcp(itlib::span<const EndpointInfo> span) {
+std::vector<tcp::endpoint> EndpointInfo_toTcp(std::span<const EndpointInfo> span) {
     std::vector<tcp::endpoint> eps;
     eps.reserve(span.size());
     for (auto& e : span) {
@@ -492,7 +492,7 @@ public:
     WsServer(
         net::io_context& ctx,
         const WsServerHandlerPtr& handler,
-        itlib::span<const tcp::endpoint> endpoints,
+        std::span<const tcp::endpoint> endpoints,
         SslContext* sslCtx
     )
         : m_ctx(ctx)
@@ -585,7 +585,7 @@ void WsServerHandler::stop() {
     server = {};
 }
 
-void Context::Impl::wsServe(itlib::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl) {
+void Context::Impl::wsServe(std::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl) {
     if (!handler->m_server.expired()) {
         handler->onError("handler already serving");
         return;
@@ -596,7 +596,7 @@ void Context::Impl::wsServe(itlib::span<const tcp::endpoint> eps, WsServerHandle
     server->start();
 }
 
-void Context::wsServe(itlib::span<const EndpointInfo> endpoints, WsServerHandlerPtr handler, SslContext* ssl) {
+void Context::wsServe(std::span<const EndpointInfo> endpoints, WsServerHandlerPtr handler, SslContext* ssl) {
     auto eps = EndpointInfo_toTcp(endpoints);
     m_impl->wsServe(eps, std::move(handler), ssl);
 }
@@ -639,7 +639,7 @@ void Context_wsConnect(
 
 void Context::wsConnect(
     WsConnectionHandlerPtr handler,
-    itlib::span<const EndpointInfo> endpoints,
+    std::span<const EndpointInfo> endpoints,
     std::string_view target,
     SslContext* ssl
 ) {

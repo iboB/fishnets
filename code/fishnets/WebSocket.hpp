@@ -5,10 +5,10 @@
 #include "API.h"
 #include "ExecutorPtr.hpp"
 #include <itlib/ufunction.hpp>
-#include <itlib/span.hpp>
 #include <itlib/expected.hpp>
 #include <memory>
 #include <string>
+#include <span>
 
 namespace fishnets {
 
@@ -26,8 +26,8 @@ public:
 
     virtual bool connected() const = 0;
 
-    using ByteSpan = itlib::span<uint8_t>;
-    using ConstByteSpan = itlib::span<const uint8_t>;
+    using ByteSpan = std::span<uint8_t>;
+    using ConstByteSpan = std::span<const uint8_t>;
 
     struct Packet {
         ByteSpan data;

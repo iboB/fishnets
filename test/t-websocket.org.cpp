@@ -50,17 +50,17 @@ public:
         }
     }
 
-    void wsReceivedBinary(itlib::span<uint8_t> binary, bool complete) {
+    void wsReceivedBinary(std::span<uint8_t> binary, bool complete) {
         CHECK(complete);
         auto& packet = packets->front();
         CHECK(packet.binary());
-        itlib::span expected(packet.blob);
+        std::span expected(packet.blob);
         CHECK(std::equal(binary.begin(), binary.end(), expected.begin(), expected.end()));
         packets->pop_front();
         trySendNext();
     }
 
-    void wsReceivedText(itlib::span<char> text, bool complete) {
+    void wsReceivedText(std::span<char> text, bool complete) {
         CHECK(complete);
         std::string_view sv(text.data(), text.size());
         if (!packets) {

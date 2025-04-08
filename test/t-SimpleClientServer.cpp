@@ -38,7 +38,7 @@ struct Packet {
         return text == str;
     }
 
-    bool operator==(itlib::span<const uint8_t> bin) const {
+    bool operator==(std::span<const uint8_t> bin) const {
         if (istext) return false;
         if (binary.size() != bin.size()) return false;
         return std::memcmp(binary.data(), bin.data(), binary.size()) == 0;
@@ -75,7 +75,7 @@ class TestClientSession final : public fishnets::WsSessionHandler {
         wsReceive();
     }
 
-    void wsReceivedBinary(itlib::span<uint8_t> binary, bool complete) override {
+    void wsReceivedBinary(std::span<uint8_t> binary, bool complete) override {
         REQUIRE(receivedIndex < packets.size());
         CHECK(complete);
         CHECK((packets[receivedIndex] == binary));
@@ -84,7 +84,7 @@ class TestClientSession final : public fishnets::WsSessionHandler {
         wsReceive();
     }
 
-    void wsReceivedText(itlib::span<char> text, bool complete) override {
+    void wsReceivedText(std::span<char> text, bool complete) override {
         REQUIRE(receivedIndex < packets.size());
         CHECK(complete);
         std::string_view str(text.data(), text.size());
@@ -116,7 +116,7 @@ class TestServerSession final : public fishnets::WsSessionHandler {
         wsReceive();
     }
 
-    void wsReceivedBinary(itlib::span<uint8_t> binary, bool complete) override {
+    void wsReceivedBinary(std::span<uint8_t> binary, bool complete) override {
         CHECK(complete);
         REQUIRE(receivedIndex < packets.size());
         CHECK((packets[receivedIndex] == binary));
@@ -126,7 +126,7 @@ class TestServerSession final : public fishnets::WsSessionHandler {
         wsReceive();
     }
 
-    void wsReceivedText(itlib::span<char> text, bool complete) override {
+    void wsReceivedText(std::span<char> text, bool complete) override {
         CHECK(complete);
         REQUIRE(receivedIndex < packets.size());
         std::string_view str(text.data(), text.size());

@@ -69,7 +69,7 @@ void WsSessionHandler::wsReceive(WebSocket::ByteSpan buf) {
             m_closeStatus.recv = CloseStatus::none; // can receive again
             if (res->text) {
                 static_assert(sizeof(char) == sizeof(*res->data.data()));
-                itlib::span<char> text{reinterpret_cast<char*>(res->data.data()), res->data.size()};
+                std::span<char> text{reinterpret_cast<char*>(res->data.data()), res->data.size()};
                 wsReceivedText(text, res->complete);
             }
             else {
@@ -107,12 +107,14 @@ void WsSessionHandler::doSend(WebSocket::ConstPacket packet) {
     });
 }
 
-void WsSessionHandler::wsSend(itlib::span<const uint8_t> binary, bool complete) {
+void WsSessionHandler::wsSend(std::span<const uint8_t> binary, bool complete) {
     doSend({binary, complete, false});
 
 }
 void WsSessionHandler::wsSend(std::string_view text, bool complete) {
-    doSend({itlib::span(text).as_bytes(), complete, true});
+    {
+        doSend({{reinterpret_cast<const uint8_t*>(text.data()), text.size()}, complete, true});
+    }
 }
 
 EndpointInfo WsSessionHandler::wsGetEndpointInfo() const {
@@ -134,8 +136,8 @@ void WsSessionHandler::wsOpened(std::string_view) {}
 void WsSessionHandler::wsClosed(std::string msg) {
     printf("WebSocket disconnected: %s\n", msg.c_str());
 }
-void WsSessionHandler::wsReceivedBinary(itlib::span<uint8_t>, bool) {}
-void WsSessionHandler::wsReceivedText(itlib::span<char>, bool) {}
+void WsSessionHandler::wsReceivedBinary(std::span<uint8_t>, bool) {}
+void WsSessionHandler::wsReceivedText(std::span<char>, bool) {}
 void WsSessionHandler::wsCompletedSend() {}
 
 } // namespace fishnets

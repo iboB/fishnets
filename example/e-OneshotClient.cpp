@@ -20,12 +20,12 @@ class OneshotSession final : public fishnets::WsSessionHandler {
         wsReceive();
     }
 
-    void wsReceivedBinary(itlib::span<uint8_t> binary, bool) override {
+    void wsReceivedBinary(std::span<uint8_t> binary, bool) override {
         std::cout << "Received binary with size " << binary.size() << '\n';
         wsClose();
     }
 
-    void wsReceivedText(itlib::span<char> text, bool) override {
+    void wsReceivedText(std::span<char> text, bool) override {
         std::string_view str(text.data(), text.size());
         std::cout << "Received text: " << str << '\n';
         wsClose();
