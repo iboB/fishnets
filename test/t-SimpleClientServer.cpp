@@ -188,6 +188,7 @@ class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSes
     size_t receivedIndex = 0;
 };
 
+template <typename SessionType>
 struct TestServer {
     fishnets::Context m_ctx;
     std::shared_ptr<fishnets::SslContext> m_sslCtx = createServerTestSslCtx();
@@ -200,7 +201,7 @@ struct TestServer {
                 CHECK(local.address == "127.0.0.1");
                 CHECK(local.port == Test_Port);
                 CHECK(remote.address == "127.0.0.1");
-                return std::make_shared<TestEchoSession>(Role::Server, 0);
+                return std::make_shared<SessionType>(Role::Server, 0);
             }),
             m_sslCtx.get()
         );
@@ -214,28 +215,27 @@ struct TestServer {
     }
 };
 
-std::shared_ptr<TestSenderSession> runTestClient() {
-    auto ret = std::make_shared<TestSenderSession>(Role::Client, 0);
+template <typename SessionType>
+void runTestClient() {
     fishnets::Context ctx;
     auto sslCtx = createClientTestSslCtx();
     ctx.wsConnect(
-        ret,
+        std::make_shared<SessionType>(Role::Client, 0),
         {"127.0.0.1", Test_Port},
         SessionTargetFixture::target,
         sslCtx.get()
     );
     ctx.run();
-    return ret;
 };
 
 TEST_CASE("connect") {
-    TestServer server;
-    auto s = runTestClient();
+    TestServer<TestEchoSession> server;
+    runTestClient<TestSenderSession>();
 }
 
 TEST_CASE("connect target") {
     SessionTargetFixture f("/xyz");
 
-    TestServer server;
-    auto s = runTestClient();
+    TestServer<TestSenderSession> server;
+    runTestClient<TestEchoSession>();
 }
