@@ -12,6 +12,7 @@
 #include <deque>
 #include <optional>
 #include <thread>
+#include <mutex>
 
 constexpr uint16_t Test_Port = 7654;
 
@@ -52,7 +53,36 @@ const std::vector<Packet> packets = {
     Packet{false, {}, {5, 6, 7}},
 };
 
-class TestClientSession final : public fishnets::WsSessionHandler {
+enum class Role {
+    Client,
+    Server
+};
+
+class BasicSession {
+public:
+    BasicSession(Role role, uint32_t id)
+        : m_role(role)
+        , m_id(id)
+    {}
+
+protected:
+    const Role m_role = Role::Client;
+    const uint32_t m_id = 0;
+
+    ~BasicSession() = default;
+
+    void checkOpen(std::string_view target, fishnets::EndpointInfo ep) {
+        CHECK(ep.address == "127.0.0.1");
+        if (m_role == Role::Client) {
+            CHECK(ep.port == Test_Port);
+        }
+        CHECK(target == SessionTargetFixture::target);
+    }
+};
+
+class TestSenderSession final : public fishnets::WsSessionHandler, public BasicSession {
+    using BasicSession::BasicSession;
+
     void sendNext() {
         auto& packet = packets[sendIndex++];
         if (packet.istext) wsSend(packet.text);
@@ -66,10 +96,7 @@ class TestClientSession final : public fishnets::WsSessionHandler {
     }
 
     void wsOpened(std::string_view target) override {
-        auto ep = wsGetEndpointInfo();
-        CHECK(ep.address == "127.0.0.1");
-        CHECK(ep.port == Test_Port);
-        CHECK(target == SessionTargetFixture::target);
+        checkOpen(target, wsGetEndpointInfo());
 
         sendNext();
         wsReceive();
@@ -103,16 +130,20 @@ class TestClientSession final : public fishnets::WsSessionHandler {
         sendNext();
     }
 
-public:
+    void wsClosed(std::string) override {
+        CHECK(receivedIndex == packets.size());
+        CHECK(sendIndex == packets.size());
+    }
+
     size_t sendIndex = 0;
     size_t receivedIndex = 0;
 };
 
-class TestServerSession final : public fishnets::WsSessionHandler {
+class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSession {
+    using BasicSession::BasicSession;
+
     void wsOpened(std::string_view target) override {
-        auto ep = wsGetEndpointInfo();
-        CHECK(ep.address == "127.0.0.1");
-        CHECK(target == SessionTargetFixture::target);
+        checkOpen(target, wsGetEndpointInfo());
         wsReceive();
     }
 
@@ -169,7 +200,7 @@ struct TestServer {
                 CHECK(local.address == "127.0.0.1");
                 CHECK(local.port == Test_Port);
                 CHECK(remote.address == "127.0.0.1");
-                return std::make_shared<TestServerSession>();
+                return std::make_shared<TestEchoSession>(Role::Server, 0);
             }),
             m_sslCtx.get()
         );
@@ -183,8 +214,8 @@ struct TestServer {
     }
 };
 
-std::shared_ptr<TestClientSession> runTestClient() {
-    auto ret = std::make_shared<TestClientSession>();
+std::shared_ptr<TestSenderSession> runTestClient() {
+    auto ret = std::make_shared<TestSenderSession>(Role::Client, 0);
     fishnets::Context ctx;
     auto sslCtx = createClientTestSslCtx();
     ctx.wsConnect(
@@ -200,9 +231,6 @@ std::shared_ptr<TestClientSession> runTestClient() {
 TEST_CASE("connect") {
     TestServer server;
     auto s = runTestClient();
-    REQUIRE(s);
-    CHECK(s->sendIndex == packets.size());
-    CHECK(s->receivedIndex == packets.size());
 }
 
 TEST_CASE("connect target") {
@@ -210,7 +238,4 @@ TEST_CASE("connect target") {
 
     TestServer server;
     auto s = runTestClient();
-    REQUIRE(s);
-    CHECK(s->sendIndex == packets.size());
-    CHECK(s->receivedIndex == packets.size());
 }
