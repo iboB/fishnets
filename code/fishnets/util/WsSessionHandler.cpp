@@ -4,12 +4,10 @@
 #include "WsSessionHandler.hpp"
 #include "../EndpointInfo.hpp"
 #include "../Post.hpp"
-#include <itlib/throw_ex.hpp>
 #include <cstdio>
+#include <stdexcept>
 
 namespace fishnets {
-
-using throw_ex = itlib::throw_ex<std::runtime_error>;
 
 WsSessionHandler::WsSessionHandler() = default;
 WsSessionHandler::~WsSessionHandler() = default;
@@ -40,7 +38,7 @@ void WsSessionHandler::tryCallWsClosed() {
 void WsSessionHandler::wsClose() {
     if (!m_closeStatus.open()) return; // close pending
     if (m_closeStatus.close != CloseStatus::none) {
-        throw_ex{} << "wsClose called twice";
+        throw std::runtime_error("wsClose called twice");
     }
     m_closeStatus.close = CloseStatus::active;
     m_ws->close([this, pl = shared_from_this()](WebSocket::Result<void> res) {
@@ -61,7 +59,7 @@ void WsSessionHandler::wsClose() {
 void WsSessionHandler::wsReceive(WebSocket::ByteSpan buf) {
     if (!m_closeStatus.open()) return; // close pending
     if (m_closeStatus.recv != CloseStatus::none) {
-        throw_ex{} << "wsReceive called twice";
+        throw std::runtime_error("wsReceive called twice");
     }
     m_closeStatus.recv = CloseStatus::active;
     m_ws->recv(buf, [this, pl = shared_from_this()](WebSocket::Result<WebSocket::Packet> res) {
@@ -89,7 +87,7 @@ void WsSessionHandler::wsReceive(WebSocket::ByteSpan buf) {
 void WsSessionHandler::doSend(WebSocket::ConstPacket packet) {
     if (!m_closeStatus.open()) return; // close pending
     if (m_closeStatus.send != CloseStatus::none) {
-        throw_ex{} << "wsSend called twice";
+        throw std::runtime_error("wsSend called twice");
     }
     m_closeStatus.send = CloseStatus::active;
     m_ws->send(packet, [this, pl = shared_from_this()](WebSocket::Result<void> res) {
