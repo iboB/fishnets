@@ -72,7 +72,7 @@ protected:
     // the lifetime of the session handler itself will be extended until the corresponding wsReceived* is called
     void wsReceive(WebSocket::ByteSpan buf = {});
 
-    // the buffer argment of these callbacks is the span provided to wsReceive (or a view of the internal buffer)
+    // the buffer argument of these callbacks is the span provided to wsReceive (or a view of the internal buffer)
     // it will be resized to the size of the received data
     // complete will be true if the data completes the frame
     virtual void wsReceivedBinary(std::span<uint8_t> binary, bool complete);

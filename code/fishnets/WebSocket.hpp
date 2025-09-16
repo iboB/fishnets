@@ -56,7 +56,7 @@ public:
     // calls to recv without the corresponding callback of the previous receive being called result in UB
     // the argument is a span to be filled with the received data or an empty span in which case an
     // internal growable buffer will be used (complete in completion handler will always be true)
-    // the buffer argment of the callback is the span provided as a first argument (or a view of the internal buffer)
+    // the buffer argument of the callback is the span provided as a first argument (or a view of the internal buffer)
     // it will be resized to the size of the received data
     using RecvCb = itlib::ufunction<void(Result<Packet>)>;
     virtual void recv(ByteSpan span, RecvCb cb) = 0;
