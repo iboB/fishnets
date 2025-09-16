@@ -429,7 +429,7 @@ struct ClientConnectorT : public ClientConnector {
         m_ws.set_option(timeout);
 
         auto id = opts.hostId.value_or(
-            std::string("fishnets-ws-client ") + BOOST_BEAST_VERSION_STRING
+            std::string("fishnets-ws-client/") + BOOST_BEAST_VERSION_STRING
         );
         m_ws.set_option(bsb::decorator([id = std::move(id)](ws::request_type& req) {
             req.set(http::field::user_agent, id);
