@@ -110,9 +110,7 @@ void WsSessionHandler::wsSend(std::span<const uint8_t> binary, bool complete) {
 
 }
 void WsSessionHandler::wsSend(std::string_view text, bool complete) {
-    {
-        doSend({{reinterpret_cast<const uint8_t*>(text.data()), text.size()}, complete, true});
-    }
+    doSend({{reinterpret_cast<const uint8_t*>(text.data()), text.size()}, complete, true});
 }
 
 EndpointInfo WsSessionHandler::wsGetEndpointInfo() const {
