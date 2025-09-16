@@ -26,6 +26,7 @@
 
 #include <unordered_map>
 #include <cstdio>
+#include <mutex>
 #include <list>
 
 #if !defined(FISHNETS_ENABLE_SSL)
@@ -49,6 +50,17 @@ namespace fishnets {
 struct Context::Impl {
     net::io_context ctx;
     void wsServe(std::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl);
+
+    tcp::resolver& get_resolver() {
+        std::scoped_lock lock(m_resolverMutex);
+        if (!m_resolver) {
+            m_resolver.emplace(ctx);
+        }
+        return *m_resolver;
+    }
+private:
+    std::mutex m_resolverMutex;
+    std::optional<tcp::resolver> m_resolver;
 };
 
 struct ContextWorkGuard::Impl {
@@ -692,16 +704,14 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
         port = sslCtx ? "443" : "80";
     }
 
-    auto resolver = std::make_unique<tcp::resolver>(m_impl->ctx);
-    auto presolver = resolver.get();
-    presolver->async_resolve(authSplit.host, port,
+    auto& resolver = m_impl->get_resolver();
+    resolver.async_resolve(authSplit.host, port,
         [
             this,
             handler,
             sslCtx,
             host = std::string(authSplit.host),
-            target = std::string(uriSplit.req_path),
-            pl = std::move(resolver)
+            target = std::string(uriSplit.req_path)
         ](beast::error_code e, tcp::resolver::results_type results) mutable {
             if (e) {
                 handler->onConnectionError(std::string("resolve: ") + e.message());
