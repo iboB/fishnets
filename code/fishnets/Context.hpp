@@ -6,6 +6,8 @@
 #include "EndpointInfo.hpp"
 #include "WsServerHandlerPtr.hpp"
 #include "WsConnectionHandlerPtr.hpp"
+#include "HttpRequestBuilderPtr.hpp"
+#include "HttpResponseHandlerPtr.hpp"
 #include "ExecutorPtr.hpp"
 #include <span>
 
@@ -73,6 +75,12 @@ public:
     void wsConnect(
         WsConnectionHandlerPtr handler,
         std::string_view url,
+        SslContext* sslCtx = nullptr
+    );
+
+    void httpRequest(
+        HttpRequestBuilderPtr builder,
+        HttpResponseHandlerPtr handler,
         SslContext* sslCtx = nullptr
     );
 

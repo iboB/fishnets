@@ -52,7 +52,7 @@ struct Context::Impl {
     void wsServe(std::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl);
 
     tcp::resolver& get_resolver() {
-        std::scoped_lock lock(m_resolverMutex);
+        std::lock_guard lock(m_resolverMutex);
         if (!m_resolver) {
             m_resolver.emplace(ctx);
         }
