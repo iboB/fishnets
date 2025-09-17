@@ -3,7 +3,11 @@
 #
 icm_add_lib(fishnets FISHNETS
     AsioImpl.cpp
+
     WsConnectionHandler.cpp
+
+    HttpRequestHeader.cpp
+    HttpResponseHandler.cpp
 
     util/WsSessionHandler.cpp
 )
@@ -11,7 +15,6 @@ add_library(fishnets::fishnets ALIAS fishnets)
 
 target_compile_features(fishnets PUBLIC cxx_std_20)
 
-icm_bigobj(FishnetsImpl.cpp)
 icm_bigobj(AsioImpl.cpp)
 
 target_link_libraries(fishnets

@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: MIT
 //
 #pragma once
-#include <memory>
 
 namespace fishnets {
-class HttpResponseHandler;
-using HttpResponseHandlerPtr = std::shared_ptr<HttpResponseHandler>;
+
+class HttpRequestBody {
+};
+
 } // namespace fishnets

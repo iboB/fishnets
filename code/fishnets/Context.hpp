@@ -6,7 +6,6 @@
 #include "EndpointInfo.hpp"
 #include "WsServerHandlerPtr.hpp"
 #include "WsConnectionHandlerPtr.hpp"
-#include "HttpRequestBuilderPtr.hpp"
 #include "HttpResponseHandlerPtr.hpp"
 #include "ExecutorPtr.hpp"
 #include <span>
@@ -15,6 +14,8 @@ namespace fishnets {
 
 class SslContext;
 class ContextWorkGuard;
+class HttpRequestBody;
+struct HttpRequestHeader;
 
 class FISHNETS_API Context {
 public:
@@ -79,7 +80,8 @@ public:
     );
 
     void httpRequest(
-        HttpRequestBuilderPtr builder,
+        const HttpRequestHeader& header,
+        HttpRequestBody body,
         HttpResponseHandlerPtr handler,
         SslContext* sslCtx = nullptr
     );
