@@ -6,7 +6,7 @@ icm_add_lib(fishnets FISHNETS
 
     WsConnectionHandler.cpp
 
-    HttpRequestHeader.cpp
+    HttpRequestDesc.cpp
     HttpResponseHandler.cpp
 
     util/WsSessionHandler.cpp

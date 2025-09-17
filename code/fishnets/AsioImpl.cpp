@@ -13,7 +13,7 @@
 #include "WsServerHandler.hpp"
 #include "WebSocketOptions.hpp"
 
-#include "HttpRequestHeader.hpp"
+#include "HttpRequestDesc.hpp"
 #include "HttpRequestBody.hpp"
 #include "HttpResponseHandler.hpp"
 #include "HttpRequestOptions.hpp"
@@ -803,17 +803,6 @@ struct HttpConnectorTcp final : public HttpConnectorT<beast::tcp_stream> {
     virtual net::awaitable<void> handshake(std::string_view) override { co_return; } // no-op for non-ssl
 };
 
-http::verb HttpRequestHeader_toBeastVerb(HttpRequestHeader::Method method) {
-    switch (method) {
-    case HttpRequestHeader::GET:  return http::verb::get;
-    case HttpRequestHeader::HEAD: return http::verb::head;
-    case HttpRequestHeader::POST: return http::verb::post;
-    case HttpRequestHeader::PUT:  return http::verb::put;
-    case HttpRequestHeader::DEL:  return http::verb::delete_;
-    default: return http::verb::unknown;
-    }
-}
-
 static net::awaitable<void> Context_httpRequest(
     Context::Impl& self,
     request_t req,
@@ -840,11 +829,20 @@ static net::awaitable<void> Context_httpRequest(
             beast::tcp_stream init_stream(asioCtx);
             co_await init_stream.async_connect(resolved, ua);
 
+            if (opts.timeout) {
+                init_stream.expires_after(*opts.timeout);
+            }
+
+            if (opts.disableNagle) {
+                init_stream.socket().set_option(tcp::no_delay(true));
+            }
+
 #if FISHNETS_ENABLE_SSL
             if (sslCtx) {
 
             }
 #endif
+
             co_return std::make_unique<HttpConnectorTcp>(std::move(init_stream));
         }();
 
@@ -852,7 +850,7 @@ static net::awaitable<void> Context_httpRequest(
         co_await stream->write(req);
 
         http::response_parser<http::empty_body> parser;
-        parser.body_limit(std::numeric_limits<std::uint64_t>::max());
+        parser.body_limit(opts.maxResponseSize.value_or(std::numeric_limits<std::size_t>::max()));
 
         co_await stream->readHeader(buffer, parser);
 
@@ -907,13 +905,13 @@ static net::awaitable<void> Context_httpRequest(
 
 void makeHttpRequest(
     Context& ctx,
-    const HttpRequestHeader& header,
+    const HttpRequestDesc& header,
     HttpRequestBody body,
     HttpResponseHandlerPtr handler,
     SslContext* sslCtx
 ) {
     request_t req;
-    req.method(HttpRequestHeader_toBeastVerb(header.method));
+    req.method(http::string_to_verb(header.method));
     req.target(header.target);
     req.set(http::field::host, header.host);
 
@@ -939,7 +937,7 @@ void makeHttpRequest(
         req.keep_alive(true);
     }
 
-    if (header.scheme == HttpRequestHeader::HTTP) {
+    if (header.scheme == HttpRequestDesc::HTTP) {
         sslCtx = nullptr;
     }
 
