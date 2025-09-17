@@ -6,7 +6,6 @@
 #include "ExecutorPtr.hpp"
 #include <itlib/ufunction.hpp>
 #include <itlib/expected.hpp>
-#include <memory>
 #include <string>
 #include <span>
 
@@ -14,8 +13,6 @@ namespace fishnets {
 
 struct EndpointInfo;
 struct WebSocketOptions;
-class WsSessionHandler;
-class Executor;
 
 class FISHNETS_API WebSocket {
 public:
