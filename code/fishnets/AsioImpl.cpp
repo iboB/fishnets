@@ -4,6 +4,7 @@
 #include "WsServe.hpp"
 #include "WsConnect.hpp"
 #include "MakeHttpRequest.hpp"
+#include "MakeSimpleHttpRequest.hpp"
 
 #include "Context.hpp"
 #include "ContextWorkGuard.hpp"
@@ -42,6 +43,7 @@
 
 #include <furi/furi.hpp>
 
+#include <cassert>
 #include <unordered_map>
 #include <cstdio>
 #include <mutex>
@@ -752,6 +754,11 @@ HttpResponseSocket::~HttpResponseSocket() = default;
 
 struct HttpResponseSocketImpl : public HttpResponseSocket {
     using HttpResponseSocket::m_executor;
+    http::response_parser<http::buffer_body> m_parser;
+
+    HttpResponseSocketImpl(http::response_parser<http::empty_body>& eparser)
+        : m_parser(std::move(eparser))
+    {}
 };
 
 namespace {
@@ -763,7 +770,10 @@ template <typename Stream>
 struct HttpResponseSocketT final : public HttpResponseSocketImpl {
     Stream m_stream;
 
-    explicit HttpResponseSocketT(Stream&& stream) : m_stream(std::move(stream)) {
+    explicit HttpResponseSocketT(http::response_parser<http::empty_body>& eparser, Stream&& stream)
+        : HttpResponseSocketImpl(eparser)
+        , m_stream(std::move(stream))
+    {
         m_executor = itlib::make_shared(Executor{m_stream.get_executor()});
     }
 
@@ -776,7 +786,9 @@ struct HttpConnector {
     virtual net::awaitable<size_t> write(const request_t& req) = 0;
     virtual net::awaitable<size_t> readHeader(beast::flat_buffer& buf, http::response_parser<http::empty_body>& parser) = 0;
 
-    virtual std::unique_ptr<HttpResponseSocket> makeResponseSocket() = 0;
+    virtual net::awaitable<size_t> readFullBody(beast::flat_buffer& buf, http::response_parser<http::string_body>& parser) = 0;
+
+    virtual std::unique_ptr<HttpResponseSocket> makeResponseSocket(http::response_parser<http::empty_body>& parser) = 0;
 };
 
 template <typename Stream>
@@ -793,8 +805,12 @@ struct HttpConnectorT : public HttpConnector {
         return http::async_read_header(m_stream, buf, parser, ua);
     }
 
-    virtual std::unique_ptr<HttpResponseSocket> makeResponseSocket() final override {
-        return std::make_unique<HttpResponseSocketT<Stream>>(std::move(m_stream));
+    virtual net::awaitable<size_t> readFullBody(beast::flat_buffer& buf, http::response_parser<http::string_body>& parser) {
+        return http::async_read(m_stream, buf, parser, ua);
+    }
+
+    virtual std::unique_ptr<HttpResponseSocket> makeResponseSocket(http::response_parser<http::empty_body>& parser) final override {
+        return std::make_unique<HttpResponseSocketT<Stream>>(parser, std::move(m_stream));
     }
 };
 
@@ -803,22 +819,26 @@ struct HttpConnectorTcp final : public HttpConnectorT<beast::tcp_stream> {
     virtual net::awaitable<void> handshake(std::string_view) override { co_return; } // no-op for non-ssl
 };
 
+template <bool Simple>
 static net::awaitable<void> Context_httpRequest(
     Context::Impl& self,
     request_t req,
     HttpRequestBody body,
+    HttpRequestOptions opts,
     HttpResponseHandlerPtr handler,
+    SimpleHttpRequestCb cb,
     SslContext* sslCtx
 ) {
+    assert((Simple && cb) || handler);
+
     const std::string_view scheme = sslCtx ? "https" : "http";
 
     beast::flat_buffer buffer;
 
-    auto opts = handler->getOptions();
-
     auto& asioCtx = self.ctx;
     req.body() = body.data();
 
+    std::string error;
     for (int i = 0; i <= opts.maxRedirects; ++i) try {
         auto host = req[http::field::host];
 
@@ -849,12 +869,11 @@ static net::awaitable<void> Context_httpRequest(
         co_await stream->handshake(host);
         co_await stream->write(req);
 
-        http::response_parser<http::empty_body> parser;
-        parser.body_limit(opts.maxResponseSize.value_or(std::numeric_limits<std::size_t>::max()));
+        http::response_parser<http::empty_body> eparser;
 
-        co_await stream->readHeader(buffer, parser);
+        co_await stream->readHeader(buffer, eparser);
 
-        auto& header = parser.get().base();
+        auto& header = eparser.get().base();
 
         // instead of juggling redirects, just look for location header
         auto f = header.find(http::field::location);
@@ -870,8 +889,8 @@ static net::awaitable<void> Context_httpRequest(
                 // absolute path
                 auto split = furi::uri_split::from_uri(loc);
                 if (split.scheme && split.scheme != scheme) {
-                    handler->onError("redirect to different scheme not supported");
-                    co_return;
+                    error = "redirect to different scheme not supported";
+                    break;
                 }
                 req.set(http::field::host, split.authority);
                 req.target(split.req_path);
@@ -882,68 +901,114 @@ static net::awaitable<void> Context_httpRequest(
         }
 
         // no redirect, must be ok
-        if (parser.get().result() != http::status::ok) {
-            std::string error = "http response: ";
-            error += std::to_string(parser.get().result_int());
-            handler->onError(std::move(error));
-            co_return;
+        if (eparser.get().result() != http::status::ok) {
+            error = "http response: ";
+            error += std::to_string(eparser.get().result_int());
+            break;
         }
 
-        auto respSocket = stream->makeResponseSocket();
-        handler->onReady(std::move(respSocket), host, req.target());
+        // parser.body_limit(opts.maxResponseSize.value_or(std::numeric_limits<std::size_t>::max()));
+        if constexpr (Simple) {
+            if (eparser.is_done()) {
+                cb({});
+                co_return;
+            }
+
+            http::response_parser<http::string_body> parser(std::move(eparser));
+            co_await stream->readFullBody(buffer, parser);
+            cb(parser.release().body());
+        }
+        else {
+            auto respSocket = stream->makeResponseSocket(eparser);
+            handler->onReady(std::move(respSocket), host, req.target());
+        }
+
         co_return;
     }
     catch (const std::exception& e) {
-        handler->onError(e.what());
-        co_return;
+        error = e.what();
     }
 
-    handler->onError("too many redirects");
+    if constexpr (Simple) {
+        cb(itlib::unexpected(std::move(error)));
+    }
+    else {
+        handler->onError(std::move(error));
+    }
+}
+
+request_t requestFromDesc(const HttpRequestDesc& desc, const HttpRequestBody& body) {
+    request_t req;
+    req.method(http::string_to_verb(desc.method));
+    req.target(desc.target);
+    req.set(http::field::host, desc.host);
+
+    if (desc.fields.userAgent.empty()) {
+        req.set(http::field::user_agent, std::string("fishnets-http/") + BOOST_BEAST_VERSION_STRING);
+    }
+    else {
+        req.set(http::field::user_agent, desc.fields.userAgent);
+    }
+
+    if (!desc.fields.contentType.empty()) {
+        req.set(http::field::content_type, desc.fields.contentType);
+    }
+
+    if (desc.fields.accept.empty()) {
+        req.set(http::field::accept, "*/*");
+    }
+    else {
+        req.set(http::field::accept, desc.fields.accept);
+    }
+
+    if (desc.fields.keepAlive) {
+        req.keep_alive(true);
+    }
+
+    return req;
 }
 
 } // namespace
 
 void makeHttpRequest(
     Context& ctx,
-    const HttpRequestDesc& header,
+    const HttpRequestDesc& desc,
     HttpRequestBody body,
     HttpResponseHandlerPtr handler,
     SslContext* sslCtx
 ) {
-    request_t req;
-    req.method(http::string_to_verb(header.method));
-    req.target(header.target);
-    req.set(http::field::host, header.host);
+    auto req = requestFromDesc(desc, body);
 
-    if (header.fields.userAgent.empty()) {
-        req.set(http::field::user_agent, std::string("fishnets-http/") + BOOST_BEAST_VERSION_STRING);
-    }
-    else {
-        req.set(http::field::user_agent, header.fields.userAgent);
-    }
-
-    if (!header.fields.contentType.empty()) {
-        req.set(http::field::content_type, header.fields.contentType);
-    }
-
-    if (header.fields.accept.empty()) {
-        req.set(http::field::accept, "*/*");
-    }
-    else {
-        req.set(http::field::accept, header.fields.accept);
-    }
-
-    if (header.fields.keepAlive) {
-        req.keep_alive(true);
-    }
-
-    if (header.scheme == HttpRequestDesc::HTTP) {
+    if (desc.scheme == HttpRequestDesc::HTTP) {
         sslCtx = nullptr;
     }
 
     net::co_spawn(
         ctx.impl().ctx,
-        Context_httpRequest(ctx.impl(), std::move(req), std::move(body), std::move(handler), sslCtx),
+        Context_httpRequest<false>(
+            ctx.impl(), std::move(req), std::move(body), handler->getOptions(), handler, {}, sslCtx),
+        net::detached
+    );
+}
+
+void makeSimpleHttpRequest(
+    Context& ctx,
+    const HttpRequestDesc& desc,
+    HttpRequestBody body,
+    SimpleHttpRequestCb cb,
+    HttpRequestOptions opts,
+    SslContext* sslCtx
+) {
+    auto req = requestFromDesc(desc, body);
+
+    if (desc.scheme == HttpRequestDesc::HTTP) {
+        sslCtx = nullptr;
+    }
+
+    net::co_spawn(
+        ctx.impl().ctx,
+        Context_httpRequest<true>(
+            ctx.impl(), std::move(req), std::move(body), std::move(opts), {}, std::move(cb), sslCtx),
         net::detached
     );
 }

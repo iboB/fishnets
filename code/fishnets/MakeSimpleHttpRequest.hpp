@@ -5,17 +5,23 @@
 #include "API.h"
 #include "HttpRequestDesc.hpp"
 #include "HttpRequestBody.hpp"
-#include "HttpResponseHandlerPtr.hpp"
+#include "HttpRequestOptions.hpp"
+#include <itlib/expected.hpp>
+#include <itlib/ufunction.hpp>
 
 namespace fishnets {
 
 class Context;
 class SslContext;
 
-FISHNETS_API void makeHttpRequest(
+using SimpleHttpRequestCb = itlib::ufunction<void(itlib::expected<std::string, std::string>)>;
+
+FISHNETS_API void makeSimpleHttpRequest(
+    Context& ctx,
     const HttpRequestDesc& desc,
     HttpRequestBody body,
-    HttpResponseHandlerPtr handler,
+    SimpleHttpRequestCb cb,
+    HttpRequestOptions opts = {},
     SslContext* sslCtx = nullptr
 );
 
