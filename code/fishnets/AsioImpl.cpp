@@ -751,7 +751,7 @@ struct HttpResponseSocketImpl : public HttpResponseSocket {
 
 namespace {
 
-using request_t = http::request<http::buffer_body>;
+using request_t = http::request<http::span_body<const uint8_t>>;
 auto ua = net::use_awaitable;
 
 template <typename Stream>
@@ -812,6 +812,7 @@ http::verb HttpRequestHeader_toBeastVerb(HttpRequestHeader::Method method) {
 static net::awaitable<void> Context_httpRequest(
     Context& self,
     request_t req,
+    HttpRequestBody body,
     HttpResponseHandlerPtr handler,
     SslContext* sslCtx
 ) {
@@ -822,6 +823,7 @@ static net::awaitable<void> Context_httpRequest(
     auto opts = handler->getOptions();
 
     auto& asioCtx = self.impl().ctx;
+    req.body() = body.data();
 
     for (int i = 0; i <= opts.maxRedirects; ++i) try {
         auto host = req[http::field::host];
@@ -937,7 +939,7 @@ void Context::httpRequest(
 
     net::co_spawn(
         m_impl->ctx,
-        Context_httpRequest(*this, std::move(req), std::move(handler), sslCtx),
+        Context_httpRequest(*this, std::move(req), std::move(body), std::move(handler), sslCtx),
         net::detached
     );
 }
