@@ -756,6 +756,9 @@ struct HttpResponseSocketImpl : public HttpResponseSocket {
     using HttpResponseSocket::m_executor;
     http::response_parser<http::buffer_body> m_parser;
 
+    beast::flat_buffer m_flatBuf;
+    ByteSpan m_dataBuf;
+
     HttpResponseSocketImpl(http::response_parser<http::empty_body>& eparser)
         : m_parser(std::move(eparser))
     {}
@@ -777,7 +780,35 @@ struct HttpResponseSocketT final : public HttpResponseSocketImpl {
         m_executor = itlib::make_shared(Executor{m_stream.get_executor()});
     }
 
-    void close(CloseCb) override {}
+    bool connected() const override {
+        return beast::get_lowest_layer(m_stream).socket().is_open();
+    }
+
+    void recv(ByteSpan span, RecvCb cb) override {
+        auto onRead = [this, cb = std::move(cb)](beast::error_code e, size_t size) {
+            if (e && e != http::error::need_buffer && e != http::error::end_of_chunk) {
+                cb(itlib::unexpected(e.message()));
+                return;
+            }
+
+            cb(Packet{
+                .data = m_dataBuf.subspan(0, size),
+                .complete = m_parser.is_done()
+                });
+
+            m_dataBuf = {};
+        };
+
+        m_dataBuf = span;
+        auto body = m_parser.get().body();
+        body.data = m_dataBuf.data();
+        body.size = m_dataBuf.size();
+        http::async_read(m_stream, m_flatBuf, m_parser, std::move(onRead));
+    }
+
+    void close() override {
+        m_stream.close();
+    }
 };
 
 struct HttpConnector {
