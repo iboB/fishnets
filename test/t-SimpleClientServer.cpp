@@ -9,6 +9,8 @@
 #include <fishnets/WsServerHandler.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
 #include <fishnets/util/ThreadRunner.hpp>
+#include <fishnets/WsServe.hpp>
+#include <fishnets/WsConnect.hpp>
 
 #include <cstring>
 #include <deque>
@@ -208,7 +210,8 @@ struct TestServer {
     uint32_t m_freeSessionId = 0;
 
     TestServer(size_t numThreads) {
-        m_ctx.wsServeLocalhost(
+        wsServeLocalhost(
+            m_ctx,
             Test_Port,
             std::make_shared<fishnets::SimpleServerHandler>([this](const fishnets::EndpointInfo& local, const fishnets::EndpointInfo remote) {
                 CHECK(local.address == "127.0.0.1");
@@ -235,7 +238,8 @@ void runTestClient(TestClientRunParams params) {
     fishnets::Context ctx;
     auto sslCtx = createClientTestSslCtx();
     for (uint32_t i = 0; i < params.numSessions; ++i) {
-        ctx.wsConnect(
+        wsConnect(
+            ctx,
             std::make_shared<SessionType>(Role::Client, i),
             {"127.0.0.1", Test_Port},
             SessionTargetFixture::target,

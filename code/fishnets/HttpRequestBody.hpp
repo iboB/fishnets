@@ -3,6 +3,7 @@
 //
 #pragma once
 #include <variant>
+#include <vector>
 #include <span>
 
 namespace fishnets {

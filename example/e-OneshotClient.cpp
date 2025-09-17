@@ -3,6 +3,7 @@
 //
 #include <fishnets/Context.hpp>
 #include <fishnets/SslContext.hpp>
+#include <fishnets/WsConnect.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
 
 #include <iostream>
@@ -40,7 +41,8 @@ int main() {
     fishnets::Context ctx;
     //fishnets::SslContext ssl;
 
-    ctx.wsConnect(
+    wsConnect(
+        ctx,
         std::make_shared<OneshotSession>(),
         //"wss://echo.websocket.org",
         "ws://localhost:7654"

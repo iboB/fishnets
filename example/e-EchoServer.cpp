@@ -3,6 +3,7 @@
 //
 #include <fishnets/Context.hpp>
 #include <fishnets/WsServerHandler.hpp>
+#include <fishnets/WsServe.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
 
 #include <iostream>
@@ -48,7 +49,8 @@ class EchoServerSession final : public fishnets::WsSessionHandler {
 int main() {
     fishnets::Context ctx;
 
-    ctx.wsServe(
+    wsServe(
+        ctx,
         {fishnets::IPv4, 7654},
         std::make_shared<fishnets::SimpleServerHandler>([](const fishnets::EndpointInfo&, const fishnets::EndpointInfo&) {
             return std::make_shared<EchoServerSession>();

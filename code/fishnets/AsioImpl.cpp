@@ -1,6 +1,10 @@
 // Copyright (c) Borislav Stanimirov
 // SPDX-License-Identifier: MIT
 //
+#include "WsServe.hpp"
+#include "WsConnect.hpp"
+#include "MakeHttpRequest.hpp"
+
 #include "Context.hpp"
 #include "ContextWorkGuard.hpp"
 
@@ -622,21 +626,21 @@ void Context::Impl::wsServe(std::span<const tcp::endpoint> eps, WsServerHandlerP
     server->start();
 }
 
-void Context::wsServe(std::span<const EndpointInfo> endpoints, WsServerHandlerPtr handler, SslContext* ssl) {
+void wsServe(Context& ctx, std::span<const EndpointInfo> endpoints, WsServerHandlerPtr handler, SslContext* ssl) {
     auto eps = EndpointInfo_toTcp(endpoints);
-    m_impl->wsServe(eps, std::move(handler), ssl);
+    ctx.impl().wsServe(eps, std::move(handler), ssl);
 }
 
-void Context::wsServeLocalhost(uint16_t port, WsServerHandlerPtr handler, SslContext* ssl) {
+void wsServeLocalhost(Context& ctx, uint16_t port, WsServerHandlerPtr handler, SslContext* ssl) {
     const tcp::endpoint eps[] = {
         {net::ip::address_v4::loopback(), port},
         {net::ip::address_v6::loopback(), port},
     };
-    m_impl->wsServe(eps, std::move(handler), ssl);
+    ctx.impl().wsServe(eps, std::move(handler), ssl);
 }
 
 static void Context_wsConnect(
-    Context& self,
+    Context::Impl& self,
     WsConnectionHandlerPtr& handler,
     std::vector<tcp::endpoint> eps,
     std::string host,
@@ -645,7 +649,7 @@ static void Context_wsConnect(
 ) {
     std::shared_ptr<ClientConnector> con;
 
-    auto strand = make_strand(self.impl().ctx);
+    auto strand = make_strand(self.ctx);
 #if FISHNETS_ENABLE_SSL
     if (ssl) {
         con = std::make_shared<ClientConnectorSsl>(RawWsSsl(std::move(strand), ssl->impl().ctx));
@@ -664,7 +668,8 @@ static void Context_wsConnect(
     con->connect(std::move(eps));
 }
 
-void Context::wsConnect(
+void wsConnect(
+    Context& ctx,
     WsConnectionHandlerPtr handler,
     std::span<const EndpointInfo> endpoints,
     std::string_view target,
@@ -680,7 +685,7 @@ void Context::wsConnect(
     auto eps = EndpointInfo_toTcp(endpoints);
 
     Context_wsConnect(
-        *this,
+        ctx.impl(),
         handler,
         std::move(eps),
         {},
@@ -689,7 +694,7 @@ void Context::wsConnect(
     );
 }
 
-void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, SslContext* sslCtx) {
+void wsConnect(Context& ctx, WsConnectionHandlerPtr handler, std::string_view url, SslContext* sslCtx) {
     auto uriSplit = furi::uri_split::from_uri(url);
     if (uriSplit.scheme) {
         if (uriSplit.scheme == "http" || uriSplit.scheme == "ws") {
@@ -718,10 +723,10 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
         port = sslCtx ? "443" : "80";
     }
 
-    auto& resolver = m_impl->get_resolver();
+    auto& resolver = ctx.impl().get_resolver();
     resolver.async_resolve(authSplit.host, port,
         [
-            this,
+            &self = ctx.impl(),
             handler,
             sslCtx,
             host = std::string(authSplit.host),
@@ -737,7 +742,7 @@ void Context::wsConnect(WsConnectionHandlerPtr handler, std::string_view url, Ss
                 eps.push_back(ep.endpoint());
             }
 
-            Context_wsConnect(*this, handler, std::move(eps), std::move(host), std::move(target), sslCtx);
+            Context_wsConnect(self, handler, std::move(eps), std::move(host), std::move(target), sslCtx);
         }
     );
 }
@@ -810,7 +815,7 @@ http::verb HttpRequestHeader_toBeastVerb(HttpRequestHeader::Method method) {
 }
 
 static net::awaitable<void> Context_httpRequest(
-    Context& self,
+    Context::Impl& self,
     request_t req,
     HttpRequestBody body,
     HttpResponseHandlerPtr handler,
@@ -822,14 +827,14 @@ static net::awaitable<void> Context_httpRequest(
 
     auto opts = handler->getOptions();
 
-    auto& asioCtx = self.impl().ctx;
+    auto& asioCtx = self.ctx;
     req.body() = body.data();
 
     for (int i = 0; i <= opts.maxRedirects; ++i) try {
         auto host = req[http::field::host];
 
         auto stream = co_await [&]() -> net::awaitable<std::unique_ptr<HttpConnector>> {
-            tcp::resolver& resolver = self.impl().get_resolver();
+            tcp::resolver& resolver = self.get_resolver();
             auto resolved = co_await resolver.async_resolve(host, scheme, ua);
 
             beast::tcp_stream init_stream(asioCtx);
@@ -900,7 +905,8 @@ static net::awaitable<void> Context_httpRequest(
 
 } // namespace
 
-void Context::httpRequest(
+void makeHttpRequest(
+    Context& ctx,
     const HttpRequestHeader& header,
     HttpRequestBody body,
     HttpResponseHandlerPtr handler,
@@ -938,8 +944,8 @@ void Context::httpRequest(
     }
 
     net::co_spawn(
-        m_impl->ctx,
-        Context_httpRequest(*this, std::move(req), std::move(body), std::move(handler), sslCtx),
+        ctx.impl().ctx,
+        Context_httpRequest(ctx.impl(), std::move(req), std::move(body), std::move(handler), sslCtx),
         net::detached
     );
 }

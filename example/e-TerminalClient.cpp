@@ -3,6 +3,7 @@
 //
 #include <fishnets/Context.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
+#include <fishnets/WsConnect.hpp>
 
 #include <atomic>
 #include <iostream>
@@ -77,7 +78,7 @@ int main()
     fishnets::Context ctx;
     auto session = std::make_shared<Session>();
 
-    ctx.wsConnect(session, "ws://localhost:7654");
+    wsConnect(ctx, session, "ws://localhost:7654");
 
     std::thread t([&ctx] {
         ctx.run();
