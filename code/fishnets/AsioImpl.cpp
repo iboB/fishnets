@@ -794,7 +794,7 @@ struct HttpResponseSocketT final : public HttpResponseSocketImpl {
             cb(Packet{
                 .data = m_dataBuf.subspan(0, size),
                 .complete = m_parser.is_done()
-                });
+            });
 
             m_dataBuf = {};
         };
@@ -871,6 +871,8 @@ static net::awaitable<void> Context_httpRequest(
 
     std::string error;
     for (int i = 0; i <= opts.maxRedirects; ++i) try {
+        buffer.clear();
+
         auto host = req[http::field::host];
 
         auto stream = co_await [&]() -> net::awaitable<std::unique_ptr<HttpConnector>> {
