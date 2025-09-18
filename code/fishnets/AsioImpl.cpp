@@ -807,7 +807,7 @@ struct HttpResponseSocketT final : public HttpResponseSocketImpl {
     }
 
     void close() override {
-        m_stream.close();
+        beast::get_lowest_layer(m_stream).close();
     }
 };
 
@@ -849,6 +849,20 @@ struct HttpConnectorTcp final : public HttpConnectorT<beast::tcp_stream> {
     using HttpConnectorT<beast::tcp_stream>::HttpConnectorT;
     virtual net::awaitable<void> handshake(std::string_view) override { co_return; } // no-op for non-ssl
 };
+
+#if FISHNETS_ENABLE_SSL
+struct HttpConnectorSsl final : public HttpConnectorT<beast::ssl_stream<beast::tcp_stream>> {
+    using HttpConnectorT<beast::ssl_stream<beast::tcp_stream>>::HttpConnectorT;
+    virtual net::awaitable<void> handshake(std::string_view host) override {
+        // Set SNI Hostname (many hosts need this to handshake successfully)
+        if (!SSL_set_tlsext_host_name(m_stream.native_handle(), host.data())) {
+            auto e = beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category());
+            throw beast::system_error(e);
+        }
+        return m_stream.async_handshake(ssl::stream_base::client, ua);
+    }
+};
+#endif
 
 template <bool Simple>
 static net::awaitable<void> Context_httpRequest(
@@ -892,7 +906,7 @@ static net::awaitable<void> Context_httpRequest(
 
 #if FISHNETS_ENABLE_SSL
             if (sslCtx) {
-
+                co_return std::make_unique<HttpConnectorSsl>(std::move(init_stream), sslCtx->impl().ctx);
             }
 #endif
 
