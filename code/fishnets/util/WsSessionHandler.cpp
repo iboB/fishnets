@@ -105,12 +105,12 @@ void WsSessionHandler::doSend(WebSocket::ConstPacket packet) {
     });
 }
 
-void WsSessionHandler::wsSend(std::span<const uint8_t> binary, bool complete) {
+void WsSessionHandler::wsSend(std::span<const std::byte> binary, bool complete) {
     doSend({binary, complete, false});
 
 }
 void WsSessionHandler::wsSend(std::string_view text, bool complete) {
-    doSend({{reinterpret_cast<const uint8_t*>(text.data()), text.size()}, complete, true});
+    doSend({as_bytes(std::span(text)), complete, true});
 }
 
 EndpointInfo WsSessionHandler::wsGetEndpointInfo() const {
@@ -132,7 +132,7 @@ void WsSessionHandler::wsOpened(std::string_view) {}
 void WsSessionHandler::wsClosed(std::string msg) {
     printf("WebSocket disconnected: %s\n", msg.c_str());
 }
-void WsSessionHandler::wsReceivedBinary(std::span<uint8_t>, bool) {}
+void WsSessionHandler::wsReceivedBinary(std::span<std::byte>, bool) {}
 void WsSessionHandler::wsReceivedText(std::span<char>, bool) {}
 void WsSessionHandler::wsCompletedSend() {}
 

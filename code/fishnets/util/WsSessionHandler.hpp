@@ -75,12 +75,12 @@ protected:
     // the buffer argument of these callbacks is the span provided to wsReceive (or a view of the internal buffer)
     // it will be resized to the size of the received data
     // complete will be true if the data completes the frame
-    virtual void wsReceivedBinary(std::span<uint8_t> binary, bool complete);
+    virtual void wsReceivedBinary(std::span<std::byte> binary, bool complete);
     virtual void wsReceivedText(std::span<char> text, bool complete);
 
     // call to initiate a send
     // the lifetime of the session handler will be extended until the corresponding wsCompletedSend is called
-    void wsSend(std::span<const uint8_t> binary, bool complete = true);
+    void wsSend(std::span<const std::byte> binary, bool complete = true);
     void wsSend(std::string_view text, bool complete = true);
     virtual void wsCompletedSend();
 

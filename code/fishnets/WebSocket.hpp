@@ -23,8 +23,8 @@ public:
 
     virtual bool connected() const = 0;
 
-    using ByteSpan = std::span<uint8_t>;
-    using ConstByteSpan = std::span<const uint8_t>;
+    using ByteSpan = std::span<std::byte>;
+    using ConstByteSpan = std::span<const std::byte>;
 
     struct Packet {
         ByteSpan data;

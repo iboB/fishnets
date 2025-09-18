@@ -246,7 +246,7 @@ struct WebSocketImplT final : public WebSocketImpl {
 
             WebSocket::Packet packet;
             if (m_userBuf.empty()) {
-                WebSocket::ByteSpan span(static_cast<uint8_t*>(m_growableBuf.data().data()), m_growableBuf.size());
+                WebSocket::ByteSpan span(static_cast<std::byte*>(m_growableBuf.data().data()), m_growableBuf.size());
                 packet.data = span;
             }
             else {
@@ -766,7 +766,7 @@ struct HttpResponseSocketImpl : public HttpResponseSocket {
 
 namespace {
 
-using request_t = http::request<http::span_body<const uint8_t>>;
+using request_t = http::request<http::span_body<const std::byte>>;
 auto ua = net::use_awaitable;
 
 template <typename Stream>

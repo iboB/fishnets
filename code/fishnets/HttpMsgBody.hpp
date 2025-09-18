@@ -6,6 +6,6 @@
 #include <cstdint>
 
 namespace fishnets {
-using HttpMsgBody = itlib::opt_ref_buffer_t<uint8_t>;
-using ConstHttpMsgBody = itlib::opt_ref_buffer_t<const uint8_t>;
+using HttpMsgBody = itlib::opt_ref_buffer;
+using ConstHttpMsgBody = itlib::const_opt_ref_buffer;
 } // namespace fishnets

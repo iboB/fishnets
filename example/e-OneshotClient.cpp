@@ -21,7 +21,7 @@ class OneshotSession final : public fishnets::WsSessionHandler {
         wsReceive();
     }
 
-    void wsReceivedBinary(std::span<uint8_t> binary, bool) override {
+    void wsReceivedBinary(std::span<std::byte> binary, bool) override {
         std::cout << "Received binary with size " << binary.size() << '\n';
         wsClose();
     }

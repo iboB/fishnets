@@ -4,6 +4,7 @@
 #include <fishnets/Context.hpp>
 #include <fishnets/SslContext.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
+#include <fishnets/WsConnect.hpp>
 
 #include <doctest/doctest.h>
 
@@ -45,7 +46,7 @@ public:
                 wsSend(packet.str);
             }
             else {
-                wsSend(packet.blob);
+                wsSend(as_bytes(std::span(packet.blob)));
             }
         }
     }
@@ -89,6 +90,6 @@ TEST_CASE("websocket.org echo async") {
     fishnets::SslContext sslCtx;
 
     auto session = std::make_shared<EchoSession>();
-    ctx.wsConnect(session, "wss://echo.websocket.org", &sslCtx);
+    wsConnect(ctx, session, "wss://echo.websocket.org", &sslCtx);
     ctx.run();
 }

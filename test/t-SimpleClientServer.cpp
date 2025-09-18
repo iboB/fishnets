@@ -41,7 +41,7 @@ struct Packet {
         return text == str;
     }
 
-    bool operator==(std::span<const uint8_t> bin) const {
+    bool operator==(std::span<const std::byte> bin) const {
         if (istext) return false;
         if (binary.size() != bin.size()) return false;
         return std::memcmp(binary.data(), bin.data(), binary.size()) == 0;
@@ -88,7 +88,7 @@ class TestSenderSession final : public fishnets::WsSessionHandler, public BasicS
     void sendNext() {
         auto& packet = packets[sendIndex++];
         if (packet.istext) wsSend(packet.text);
-        else wsSend(packet.binary);
+        else wsSend(as_bytes(std::span(packet.binary)));
     }
 
     void closeIfDone() {
@@ -104,7 +104,7 @@ class TestSenderSession final : public fishnets::WsSessionHandler, public BasicS
         wsReceive();
     }
 
-    void wsReceivedBinary(std::span<uint8_t> binary, bool complete) override {
+    void wsReceivedBinary(std::span<std::byte> binary, bool complete) override {
         REQUIRE(receivedIndex < packets.size());
         CHECK(complete);
         CHECK((packets[receivedIndex] == binary));
@@ -150,7 +150,7 @@ class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSes
         wsReceive();
     }
 
-    void wsReceivedBinary(std::span<uint8_t> binary, bool complete) override {
+    void wsReceivedBinary(std::span<std::byte> binary, bool complete) override {
         std::lock_guard l(*m_seqCheck);
         CHECK(complete);
         REQUIRE(receivedIndex < packets.size());
@@ -180,7 +180,7 @@ class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSes
         sendQueue.pop_front();
         auto& packet = packets[*curSend];
         if (packet.istext) wsSend(packet.text);
-        else wsSend(packet.binary);
+        else wsSend(as_bytes(std::span(packet.binary)));
     }
 
     void wsCompletedSend() override {
