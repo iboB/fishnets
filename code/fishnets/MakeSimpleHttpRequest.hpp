@@ -19,7 +19,7 @@ using SimpleHttpRequestCb = itlib::ufunction<void(itlib::expected<std::string, s
 FISHNETS_API void makeSimpleHttpRequest(
     Context& ctx,
     const HttpRequestDesc& desc,
-    HttpRequestBody body,
+    ConstHttpRequestBody body,
     SimpleHttpRequestCb cb,
     HttpRequestOptions opts = {},
     SslContext* sslCtx = nullptr

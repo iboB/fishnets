@@ -14,7 +14,7 @@ class SslContext;
 
 FISHNETS_API void makeHttpRequest(
     const HttpRequestDesc& desc,
-    HttpRequestBody body,
+    ConstHttpRequestBody body,
     HttpResponseHandlerPtr handler,
     SslContext* sslCtx = nullptr
 );

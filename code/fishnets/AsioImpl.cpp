@@ -854,7 +854,7 @@ template <bool Simple>
 static net::awaitable<void> Context_httpRequest(
     Context::Impl& self,
     request_t req,
-    HttpRequestBody body,
+    ConstHttpRequestBody body,
     HttpRequestOptions opts,
     HttpResponseHandlerPtr handler,
     SimpleHttpRequestCb cb,
@@ -867,7 +867,7 @@ static net::awaitable<void> Context_httpRequest(
     beast::flat_buffer buffer;
 
     auto& asioCtx = self.ctx;
-    req.body() = body.data();
+    req.body() = body.span();
 
     std::string error;
     for (int i = 0; i <= opts.maxRedirects; ++i) try {
@@ -970,7 +970,7 @@ static net::awaitable<void> Context_httpRequest(
     }
 }
 
-request_t requestFromDesc(const HttpRequestDesc& desc, const HttpRequestBody& body) {
+request_t requestFromDesc(const HttpRequestDesc& desc) {
     request_t req;
     req.method(http::string_to_verb(desc.method));
     req.target(desc.target);
@@ -1006,11 +1006,11 @@ request_t requestFromDesc(const HttpRequestDesc& desc, const HttpRequestBody& bo
 void makeHttpRequest(
     Context& ctx,
     const HttpRequestDesc& desc,
-    HttpRequestBody body,
+    ConstHttpRequestBody body,
     HttpResponseHandlerPtr handler,
     SslContext* sslCtx
 ) {
-    auto req = requestFromDesc(desc, body);
+    auto req = requestFromDesc(desc);
 
     if (desc.scheme == HttpRequestDesc::HTTP) {
         sslCtx = nullptr;
@@ -1027,12 +1027,12 @@ void makeHttpRequest(
 void makeSimpleHttpRequest(
     Context& ctx,
     const HttpRequestDesc& desc,
-    HttpRequestBody body,
+    ConstHttpRequestBody body,
     SimpleHttpRequestCb cb,
     HttpRequestOptions opts,
     SslContext* sslCtx
 ) {
-    auto req = requestFromDesc(desc, body);
+    auto req = requestFromDesc(desc);
 
     if (desc.scheme == HttpRequestDesc::HTTP) {
         sslCtx = nullptr;
