@@ -16,11 +16,16 @@ endif()
 
 add_library(fishnets-TestNullSslCtx STATIC TestNullSslCtx.cpp)
 target_link_libraries(fishnets-TestNullSslCtx PUBLIC fishnets::fishnets)
+macro(non_ssl_test test)
+    add_doctest_lib_test(${test} fishnets t-${test}.cpp LIBRARIES fishnets-TestNullSslCtx)
+endmacro()
 
 macro(dual_test test)
-    add_doctest_lib_test(${test}-ws fishnets t-${test}.cpp LIBRARIES fishnets-TestNullSslCtx)
+    non_ssl_test(${test})
     ssl_test(${test})
 endmacro()
 
-dual_test(SimpleClientServer)
+dual_test(ws-SimpleClientServer)
 ssl_test(websocket.org)
+
+non_ssl_test(HttpRequestDesc)
