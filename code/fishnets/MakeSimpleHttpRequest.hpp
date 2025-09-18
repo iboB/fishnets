@@ -4,7 +4,7 @@
 #pragma once
 #include "API.h"
 #include "HttpRequestDesc.hpp"
-#include "HttpRequestBody.hpp"
+#include "HttpMsgBody.hpp"
 #include "HttpRequestOptions.hpp"
 #include <itlib/expected.hpp>
 #include <itlib/ufunction.hpp>
@@ -19,7 +19,7 @@ using SimpleHttpRequestCb = itlib::ufunction<void(itlib::expected<std::string, s
 FISHNETS_API void makeSimpleHttpRequest(
     Context& ctx,
     const HttpRequestDesc& desc,
-    ConstHttpRequestBody body,
+    ConstHttpMsgBody body,
     SimpleHttpRequestCb cb,
     HttpRequestOptions opts = {},
     SslContext* sslCtx = nullptr

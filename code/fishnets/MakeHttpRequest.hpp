@@ -4,7 +4,7 @@
 #pragma once
 #include "API.h"
 #include "HttpRequestDesc.hpp"
-#include "HttpRequestBody.hpp"
+#include "HttpMsgBody.hpp"
 #include "HttpResponseHandlerPtr.hpp"
 
 namespace fishnets {
@@ -14,7 +14,7 @@ class SslContext;
 
 FISHNETS_API void makeHttpRequest(
     const HttpRequestDesc& desc,
-    ConstHttpRequestBody body,
+    ConstHttpMsgBody body,
     HttpResponseHandlerPtr handler,
     SslContext* sslCtx = nullptr
 );

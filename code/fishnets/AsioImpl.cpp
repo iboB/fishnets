@@ -15,7 +15,7 @@
 #include "WebSocketOptions.hpp"
 
 #include "HttpRequestDesc.hpp"
-#include "HttpRequestBody.hpp"
+#include "HttpMsgBody.hpp"
 #include "HttpResponseHandler.hpp"
 #include "HttpRequestOptions.hpp"
 #include "HttpResponseSocket.hpp"
@@ -854,7 +854,7 @@ template <bool Simple>
 static net::awaitable<void> Context_httpRequest(
     Context::Impl& self,
     request_t req,
-    ConstHttpRequestBody body,
+    ConstHttpMsgBody body,
     HttpRequestOptions opts,
     HttpResponseHandlerPtr handler,
     SimpleHttpRequestCb cb,
@@ -1006,7 +1006,7 @@ request_t requestFromDesc(const HttpRequestDesc& desc) {
 void makeHttpRequest(
     Context& ctx,
     const HttpRequestDesc& desc,
-    ConstHttpRequestBody body,
+    ConstHttpMsgBody body,
     HttpResponseHandlerPtr handler,
     SslContext* sslCtx
 ) {
@@ -1027,7 +1027,7 @@ void makeHttpRequest(
 void makeSimpleHttpRequest(
     Context& ctx,
     const HttpRequestDesc& desc,
-    ConstHttpRequestBody body,
+    ConstHttpMsgBody body,
     SimpleHttpRequestCb cb,
     HttpRequestOptions opts,
     SslContext* sslCtx
