@@ -40,7 +40,7 @@ endif()
 #######################################
 # packages
 CPMAddPackage(gh:iboB/splat@1.3.4)
-CPMAddPackage("gh:iboB/itlib@1.11.7a#cba8b3b")
+CPMAddPackage(gh:iboB/itlib@1.11.8)
 
 find_package(Threads REQUIRED)
 set(fishnetsHaveSsl FALSE)
@@ -75,7 +75,7 @@ if(NOT TARGET Boost::beast)
 endif()
 
 CPMAddPackage(gh:iboB/furi@1.2.1)
-CPMAddPackage("gh:iboB/xeq@0.0.2#2805bce")
+CPMAddPackage(gh:iboB/xeq@0.1.0)
 
 #######################################
 # subdirs
