@@ -62,7 +62,7 @@ using tcp = net::ip::tcp;
 
 namespace fishnets {
 
-struct ResolverHolder {
+struct XeqContextObject {
     tcp::resolver resolver;
 };
 
@@ -70,10 +70,10 @@ tcp::resolver& getResolver(xeq::context& ctx) {
     static constexpr std::string_view key = "fishnets";
     auto obj = ctx.get_object(key);
     if (obj) {
-        auto holder = static_cast<ResolverHolder*>(obj.get());
+        auto holder = static_cast<XeqContextObject*>(obj.get());
         return holder->resolver;
     }
-    auto holder = itlib::make_shared(ResolverHolder{tcp::resolver(ctx.as_asio_io_context())});
+    auto holder = itlib::make_shared(XeqContextObject{tcp::resolver(ctx.as_asio_io_context())});
     ctx.attach_object(key, holder);
     return holder->resolver;
 }
