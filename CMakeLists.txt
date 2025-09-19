@@ -13,7 +13,7 @@ include(./get_cpm.cmake)
 
 #######################################
 # cmake lib
-CPMAddPackage(gh:iboB/icm@1.5.4)
+CPMAddPackage(gh:iboB/icm@1.5.5)
 
 set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
@@ -55,12 +55,22 @@ else()
 endif()
 
 if(NOT TARGET Boost::boost)
-    # only add boost if not added from the outside
-    CPMAddPackage(gh:iboB/boost-trim@1.85.0)
+    CPMAddPackage(
+        NAME Boost
+        VERSION 1.87.0
+        URL https://github.com/boostorg/boost/releases/download/boost-1.87.0/boost-1.87.0-cmake.tar.xz
+        URL_HASH SHA256=7da75f171837577a52bbf217e17f8ea576c7c246e4594d617bfde7fafd408be5
+        SYSTEM TRUE
+        OPTIONS "BOOST_ENABLE_CMAKE ON"
+                "BOOST_INCLUDE_LIBRARIES asio\\\;beast"
+    )
+endif()
+
+if(NOT TARGET Boost::asio)
+    add_library(Boost::asio ALIAS Boost::boost)
 endif()
 
 if(NOT TARGET Boost::beast)
-    # beast is header only, so this is fine
     add_library(Boost::beast ALIAS Boost::boost)
 endif()
 

@@ -23,8 +23,6 @@
 #include "Post.hpp"
 #include "Timer.hpp"
 
-#define BOOST_BEAST_USE_STD_STRING_VIEW 1
-
 #if defined(_MSC_VER)
 #   pragma warning (disable: 4100)
 #endif
@@ -934,7 +932,7 @@ static net::awaitable<void> Context_httpRequest(
             }
             else {
                 // absolute path
-                auto split = furi::uri_split::from_uri(loc);
+                auto split = furi::uri_split::from_uri((std::string_view)loc);
                 if (split.scheme && split.scheme != scheme) {
                     error = "redirect to different scheme not supported";
                     break;
