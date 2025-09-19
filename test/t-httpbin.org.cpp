@@ -1,7 +1,7 @@
 // Copyright (c) Borislav Stanimirov
 // SPDX-License-Identifier: MIT
 //
-#include <fishnets/Context.hpp>
+#include <xeq/context.hpp>
 #include <fishnets/MakeHttpRequest.hpp>
 #include <fishnets/MakeSimpleHttpRequest.hpp>
 #include <doctest/doctest.h>
@@ -61,9 +61,9 @@ bool isExpectedBytes(const T& buf, size_t offset = 0) {
 using SimpleResult = itlib::expected<std::string, std::string>;
 
 TEST_CASE("just get") {
-    fishnets::Context ctx;
+    xeq::context ctx;
     SimpleResult responseBody;
-    makeSimpleHttpRequest(
+    fishnets::makeSimpleHttpRequest(
         ctx,
         {"GET " SCHEME "://httpbin.org/bytes/128?seed=42"},
         {/*empty body*/},

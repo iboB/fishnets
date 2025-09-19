@@ -75,6 +75,7 @@ if(NOT TARGET Boost::beast)
 endif()
 
 CPMAddPackage(gh:iboB/furi@1.2.1)
+CPMAddPackage("gh:iboB/xeq@0.0.2#2805bce")
 
 #######################################
 # subdirs

@@ -1,7 +1,7 @@
 // Copyright (c) Borislav Stanimirov
 // SPDX-License-Identifier: MIT
 //
-#include <fishnets/Context.hpp>
+#include <xeq/context.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
 #include <fishnets/WsConnect.hpp>
 
@@ -75,7 +75,7 @@ private:
 
 int main()
 {
-    fishnets::Context ctx;
+    xeq::context ctx;
     auto session = std::make_shared<Session>();
 
     wsConnect(ctx, session, "ws://localhost:7654");

@@ -5,12 +5,13 @@
 #include "TestSslCtx.hpp"
 #include "TestSeqCheck.hpp"
 
-#include <fishnets/Context.hpp>
 #include <fishnets/WsServerHandler.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
-#include <fishnets/util/ThreadRunner.hpp>
 #include <fishnets/WsServe.hpp>
 #include <fishnets/WsConnect.hpp>
+
+#include <xeq/context.hpp>
+#include <xeq/thread_runner.hpp>
 
 #include <cstring>
 #include <deque>
@@ -204,9 +205,9 @@ class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSes
 
 template <typename SessionType>
 struct TestServer {
-    fishnets::Context m_ctx;
+    xeq::context m_ctx;
     std::shared_ptr<fishnets::SslContext> m_sslCtx = createServerTestSslCtx();
-    fishnets::ThreadRunner m_runner;
+    xeq::thread_runner m_runner;
     uint32_t m_freeSessionId = 0;
 
     TestServer(size_t numThreads) {
@@ -235,7 +236,7 @@ struct TestClientRunParams {
 
 template <typename SessionType>
 void runTestClient(TestClientRunParams params) {
-    fishnets::Context ctx;
+    xeq::context ctx;
     auto sslCtx = createClientTestSslCtx();
     for (uint32_t i = 0; i < params.numSessions; ++i) {
         wsConnect(
@@ -246,7 +247,7 @@ void runTestClient(TestClientRunParams params) {
             sslCtx.get()
         );
     }
-    fishnets::ThreadRunner runner(ctx, params.numThreads);
+    xeq::thread_runner runner(ctx, params.numThreads);
 };
 
 TEST_CASE("simple connect") {

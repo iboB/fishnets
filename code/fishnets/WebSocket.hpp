@@ -3,7 +3,7 @@
 //
 #pragma once
 #include "API.h"
-#include "ExecutorPtr.hpp"
+#include <xeq/executor_ptr.hpp>
 #include <itlib/ufunction.hpp>
 #include <itlib/expected.hpp>
 #include <string>
@@ -78,13 +78,13 @@ public:
     // set options for the session
     virtual void setOptions(const WebSocketOptions& options) = 0;
 
-    const ExecutorPtr& executor() const { return m_executor; }
+    const xeq::executor_ptr& executor() const { return m_executor; }
 private:
     // sealed interface
     WebSocket();
     friend struct WebSocketImpl;
 
-    ExecutorPtr m_executor;
+    xeq::executor_ptr m_executor;
 };
 
 } // namespace fishnets

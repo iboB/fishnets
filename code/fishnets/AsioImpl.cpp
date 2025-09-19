@@ -6,9 +6,6 @@
 #include "MakeHttpRequest.hpp"
 #include "MakeSimpleHttpRequest.hpp"
 
-#include "Context.hpp"
-#include "ContextWorkGuard.hpp"
-
 #include "WebSocket.hpp"
 #include "WsConnectionHandler.hpp"
 #include "WsServerHandler.hpp"
@@ -20,12 +17,13 @@
 #include "HttpRequestOptions.hpp"
 #include "HttpResponseSocket.hpp"
 
-#include "Post.hpp"
-#include "Timer.hpp"
+#include <xeq/context.hpp>
+#include <xeq/executor.hpp>
 
 #if defined(_MSC_VER)
 #   pragma warning (disable: 4100)
 #endif
+
 #include <boost/beast/core.hpp>
 #include <boost/beast/websocket.hpp>
 #include <boost/beast/http.hpp>
@@ -44,7 +42,6 @@
 #include <cassert>
 #include <unordered_map>
 #include <cstdio>
-#include <mutex>
 #include <list>
 
 #if !defined(FISHNETS_ENABLE_SSL)
@@ -65,63 +62,20 @@ using tcp = net::ip::tcp;
 
 namespace fishnets {
 
-struct Context::Impl {
-    net::io_context ctx;
-    void wsServe(std::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl);
+struct ResolverHolder {
+    tcp::resolver resolver;
+};
 
-    tcp::resolver& get_resolver() {
-        std::lock_guard lock(m_resolverMutex);
-        if (!m_resolver) {
-            m_resolver.emplace(ctx);
-        }
-        return *m_resolver;
+tcp::resolver& getResolver(xeq::context& ctx) {
+    static constexpr std::string_view key = "fishnets";
+    auto obj = ctx.get_object(key);
+    if (obj) {
+        auto holder = static_cast<ResolverHolder*>(obj.get());
+        return holder->resolver;
     }
-private:
-    std::mutex m_resolverMutex;
-    std::optional<tcp::resolver> m_resolver;
-};
-
-struct ContextWorkGuard::Impl {
-    net::executor_work_guard<net::io_context::executor_type> guard;
-};
-
-ContextWorkGuard::ContextWorkGuard() = default;
-ContextWorkGuard::ContextWorkGuard(Context& ctx)
-    : m_impl(itlib::make_unique(Impl{net::make_work_guard(ctx.impl().ctx.get_executor())}))
-{}
-ContextWorkGuard::~ContextWorkGuard() = default;
-
-ContextWorkGuard::ContextWorkGuard(ContextWorkGuard&&) noexcept = default;
-ContextWorkGuard& ContextWorkGuard::operator=(ContextWorkGuard&&) noexcept = default;
-
-void ContextWorkGuard::reset() {
-    m_impl.reset();
-}
-
-Context::Context()
-    : m_impl(std::make_unique<Impl>())
-{}
-
-Context::~Context() = default;
-
-void Context::run() {
-    m_impl->ctx.run();
-}
-
-void Context::stop() {
-    m_impl->ctx.stop();
-}
-
-bool Context::stopped() const {
-    return m_impl->ctx.stopped();
-}
-
-void Context::restart() {
-    m_impl->ctx.restart();
-}
-
-ContextWorkGuard Context::makeWorkGuard() {
-    return ContextWorkGuard(*this);
+    auto holder = itlib::make_shared(ResolverHolder{tcp::resolver(ctx.as_asio_io_context())});
+    ctx.attach_object(key, holder);
+    return holder->resolver;
 }
 
 using RawWs = ws::stream<tcp::socket>;
@@ -166,11 +120,6 @@ void SslContext::addCertificateAuthority(std::string ca) {
 
 using RawWsSsl = ws::stream<ssl::stream<tcp::socket>>;
 #endif
-
-class Executor {
-public:
-    net::any_io_executor ex;
-};
 
 WebSocket::WebSocket() = default;
 WebSocket::~WebSocket() = default;
@@ -226,10 +175,9 @@ template <typename RawSocket>
 struct WebSocketImplT final : public WebSocketImpl {
     RawSocket m_ws;
 
-    explicit WebSocketImplT(RawSocket&& ws) : m_ws(std::move(ws)) {
-        m_executor = itlib::make_shared(Executor{m_ws.get_executor()});
+    explicit WebSocketImplT(xeq::executor_ptr ex, RawSocket&& ws) : m_ws(std::move(ws)) {
+        m_executor = std::move(ex);
     }
-
 
     bool connected() const override {
         return m_ws.is_open();
@@ -349,10 +297,12 @@ protected:
 
 template <typename RawSocket>
 struct ServerConnectorT : public ServerConnector {
+    xeq::executor_ptr m_executor;
     RawSocket m_ws;
 
-    explicit ServerConnectorT(RawSocket&& ws)
-        : m_ws(std::move(ws))
+    explicit ServerConnectorT(xeq::executor_ptr ex, RawSocket&& ws)
+        : m_executor(std::move(ex))
+        , m_ws(std::move(ws))
     {}
 
     void setInitialOptions(WebSocketOptions opts) override final {
@@ -379,7 +329,7 @@ struct ServerConnectorT : public ServerConnector {
     void onConnectionEstablished(beast::error_code e) {
         if (e) return failed(e, "accept");
         m_handler->onConnected(
-            std::make_unique<WebSocketImplT<RawSocket>>(std::move(m_ws)),
+            std::make_unique<WebSocketImplT<RawSocket>>(std::move(m_executor), std::move(m_ws)),
             m_upgradeRequest.target()
         );
     }
@@ -431,9 +381,12 @@ protected:
 
 template <typename RawSocket>
 struct ClientConnectorT : public ClientConnector {
+    xeq::executor_ptr m_executor;
     RawSocket m_ws;
 
-    explicit ClientConnectorT(RawSocket&& ws) : m_ws(std::move(ws)) {}
+    explicit ClientConnectorT(xeq::executor_ptr ex, RawSocket&& ws)
+        : m_executor(std::move(ex))
+        , m_ws(std::move(ws)) {}
 
     void doConnect() override final {
         async_connect(beast::get_lowest_layer(m_ws), m_endpoints,
@@ -478,7 +431,7 @@ struct ClientConnectorT : public ClientConnector {
     void onConnectionEstablished(beast::error_code e) {
         if (e) return failed(e, "establish");
         m_handler->onConnected(
-            std::make_unique<WebSocketImplT<RawSocket>>(std::move(m_ws)),
+            std::make_unique<WebSocketImplT<RawSocket>>(std::move(m_executor), std::move(m_ws)),
             m_target
         );
     }
@@ -512,7 +465,7 @@ struct ClientConnectorSsl final : public ClientConnectorT<RawWsSsl> {
 namespace impl {
 class WsServer : public itlib::enable_shared_from {
 public:
-    net::io_context& m_ctx;
+    xeq::context& m_ctx;
     WsServerHandlerPtr m_handler;
 
     std::vector<tcp::acceptor> m_acceptors;
@@ -520,7 +473,7 @@ public:
     SslContext* m_sslCtx = nullptr;
 
     WsServer(
-        net::io_context& ctx,
+        xeq::context& ctx,
         const WsServerHandlerPtr& handler,
         std::span<const tcp::endpoint> endpoints,
         SslContext* sslCtx
@@ -530,7 +483,7 @@ public:
         , m_sslCtx(sslCtx)
     {
         for (auto& ep : endpoints) {
-            m_acceptors.emplace_back(ctx, ep);
+            m_acceptors.emplace_back(ctx.as_asio_io_context(), ep);
         }
     }
 
@@ -549,12 +502,17 @@ public:
     }
 
     void doAccept(tcp::acceptor& a) {
-        a.async_accept(make_strand(m_ctx), [&a, this, pl = shared_from_this()](beast::error_code e, tcp::socket socket) {
-            onAccept(a, e, std::move(socket));
-        });
+        auto strand = m_ctx.make_strand();
+        auto asioStrand = strand->as_asio_executor();
+        a.async_accept(
+            std::move(asioStrand),
+            [&a, strand = std::move(strand), this, pl = shared_from_this()](beast::error_code e, tcp::socket socket) mutable {
+                onAccept(a, e, std::move(strand), std::move(socket));
+            }
+        );
     }
 
-    void onAccept(tcp::acceptor& a, beast::error_code e, tcp::socket socket) {
+    void onAccept(tcp::acceptor& a, beast::error_code e, xeq::executor_ptr socketEx, tcp::socket socket) {
         auto localEndpoint = EndpointInfo_fromTcp(a.local_endpoint());
 
         if (e) {
@@ -583,12 +541,12 @@ public:
 
 #if FISHNETS_ENABLE_SSL
         if (m_sslCtx) {
-            con = std::make_shared<ServerConnectorSsl>(RawWsSsl(std::move(socket), m_sslCtx->impl().ctx));
+            con = std::make_shared<ServerConnectorSsl>(std::move(socketEx), RawWsSsl(std::move(socket), m_sslCtx->impl().ctx));
         }
         else
 #endif
         {
-            con = std::make_shared<ServerConnectorWs>(RawWs(std::move(socket)));
+            con = std::make_shared<ServerConnectorWs>(std::move(socketEx), RawWs(std::move(socket)));
         }
 
         con->setInitialOptions(conHandler->getInitialOptions());
@@ -597,6 +555,17 @@ public:
 
         // accept more sessions
         doAccept(a);
+    }
+
+    static void serve(xeq::context& ctx, std::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl) {
+        if (!handler->m_server.expired()) {
+            handler->onError("handler already serving");
+            return;
+        }
+        auto server = std::make_shared<WsServer>(ctx, handler, eps, ssl);
+        handler->m_server = server;
+
+        server->start();
     }
 };
 
@@ -615,32 +584,21 @@ void WsServerHandler::stop() {
     server = {};
 }
 
-void Context::Impl::wsServe(std::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl) {
-    if (!handler->m_server.expired()) {
-        handler->onError("handler already serving");
-        return;
-    }
-    auto server = std::make_shared<impl::WsServer>(ctx, handler, eps, ssl);
-    handler->m_server = server;
-
-    server->start();
-}
-
-void wsServe(Context& ctx, std::span<const EndpointInfo> endpoints, WsServerHandlerPtr handler, SslContext* ssl) {
+void wsServe(xeq::context& ctx, std::span<const EndpointInfo> endpoints, WsServerHandlerPtr handler, SslContext* ssl) {
     auto eps = EndpointInfo_toTcp(endpoints);
-    ctx.impl().wsServe(eps, std::move(handler), ssl);
+    impl::WsServer::serve(ctx, eps, std::move(handler), ssl);
 }
 
-void wsServeLocalhost(Context& ctx, uint16_t port, WsServerHandlerPtr handler, SslContext* ssl) {
+void wsServeLocalhost(xeq::context& ctx, uint16_t port, WsServerHandlerPtr handler, SslContext* ssl) {
     const tcp::endpoint eps[] = {
         {net::ip::address_v4::loopback(), port},
         {net::ip::address_v6::loopback(), port},
     };
-    ctx.impl().wsServe(eps, std::move(handler), ssl);
+    impl::WsServer::serve(ctx, eps, std::move(handler), ssl);
 }
 
 static void Context_wsConnect(
-    Context::Impl& self,
+    xeq::context& ctx,
     WsConnectionHandlerPtr& handler,
     std::vector<tcp::endpoint> eps,
     std::string host,
@@ -649,15 +607,16 @@ static void Context_wsConnect(
 ) {
     std::shared_ptr<ClientConnector> con;
 
-    auto strand = make_strand(self.ctx);
+    auto strand = ctx.make_strand();
+    auto asioStrand = strand->as_asio_executor();
 #if FISHNETS_ENABLE_SSL
     if (ssl) {
-        con = std::make_shared<ClientConnectorSsl>(RawWsSsl(std::move(strand), ssl->impl().ctx));
+        con = std::make_shared<ClientConnectorSsl>(std::move(strand), RawWsSsl(std::move(asioStrand), ssl->impl().ctx));
     }
     else
 #endif
     {
-        con = std::make_shared<ClientConnectorWs>(RawWs(std::move(strand)));
+        con = std::make_shared<ClientConnectorWs>(std::move(strand), RawWs(std::move(asioStrand)));
     }
 
     con->m_handler = std::move(handler);
@@ -669,7 +628,7 @@ static void Context_wsConnect(
 }
 
 void wsConnect(
-    Context& ctx,
+    xeq::context& ctx,
     WsConnectionHandlerPtr handler,
     std::span<const EndpointInfo> endpoints,
     std::string_view target,
@@ -685,7 +644,7 @@ void wsConnect(
     auto eps = EndpointInfo_toTcp(endpoints);
 
     Context_wsConnect(
-        ctx.impl(),
+        ctx,
         handler,
         std::move(eps),
         {},
@@ -694,7 +653,7 @@ void wsConnect(
     );
 }
 
-void wsConnect(Context& ctx, WsConnectionHandlerPtr handler, std::string_view url, SslContext* sslCtx) {
+void wsConnect(xeq::context& ctx, WsConnectionHandlerPtr handler, std::string_view url, SslContext* sslCtx) {
     auto uriSplit = furi::uri_split::from_uri(url);
     if (uriSplit.scheme) {
         if (uriSplit.scheme == "http" || uriSplit.scheme == "ws") {
@@ -723,10 +682,10 @@ void wsConnect(Context& ctx, WsConnectionHandlerPtr handler, std::string_view ur
         port = sslCtx ? "443" : "80";
     }
 
-    auto& resolver = ctx.impl().get_resolver();
+    auto& resolver = getResolver(ctx);
     resolver.async_resolve(authSplit.host, port,
         [
-            &self = ctx.impl(),
+            &ctx,
             handler,
             sslCtx,
             host = std::string(authSplit.host),
@@ -742,7 +701,7 @@ void wsConnect(Context& ctx, WsConnectionHandlerPtr handler, std::string_view ur
                 eps.push_back(ep.endpoint());
             }
 
-            Context_wsConnect(self, handler, std::move(eps), std::move(host), std::move(target), sslCtx);
+            Context_wsConnect(ctx, handler, std::move(eps), std::move(host), std::move(target), sslCtx);
         }
     );
 }
@@ -771,11 +730,11 @@ template <typename Stream>
 struct HttpResponseSocketT final : public HttpResponseSocketImpl {
     Stream m_stream;
 
-    explicit HttpResponseSocketT(http::response_parser<http::empty_body>& eparser, Stream&& stream)
+    explicit HttpResponseSocketT(http::response_parser<http::empty_body>& eparser, xeq::executor_ptr ex, Stream&& stream)
         : HttpResponseSocketImpl(eparser)
         , m_stream(std::move(stream))
     {
-        m_executor = itlib::make_shared(Executor{m_stream.get_executor()});
+        m_executor = std::move(ex);
     }
 
     bool connected() const override {
@@ -822,10 +781,15 @@ struct HttpConnector {
 
 template <typename Stream>
 struct HttpConnectorT : public HttpConnector {
+    xeq::executor_ptr m_executor;
     Stream m_stream;
 
     template <typename... Args>
-    explicit HttpConnectorT(Args&&... args) : m_stream(std::forward<Args>(args)...) {}
+    explicit HttpConnectorT(xeq::executor_ptr ex, Args&&... args)
+        : m_executor(std::move(ex))
+        , m_stream(std::forward<Args>(args)...)
+
+    {}
 
     virtual net::awaitable<size_t> write(const request_t& req) final override {
         return http::async_write(m_stream, req, ua);
@@ -839,7 +803,7 @@ struct HttpConnectorT : public HttpConnector {
     }
 
     virtual std::unique_ptr<HttpResponseSocket> makeResponseSocket(http::response_parser<http::empty_body>& parser) final override {
-        return std::make_unique<HttpResponseSocketT<Stream>>(parser, std::move(m_stream));
+        return std::make_unique<HttpResponseSocketT<Stream>>(parser, std::move(m_executor), std::move(m_stream));
     }
 };
 
@@ -864,7 +828,7 @@ struct HttpConnectorSsl final : public HttpConnectorT<beast::ssl_stream<beast::t
 
 template <bool Simple>
 static net::awaitable<void> Context_httpRequest(
-    Context::Impl& self,
+    xeq::context& ctx,
     request_t req,
     ConstHttpMsgBody body,
     HttpRequestOptions opts,
@@ -878,7 +842,6 @@ static net::awaitable<void> Context_httpRequest(
 
     beast::flat_buffer buffer;
 
-    auto& asioCtx = self.ctx;
     req.body() = body.span();
 
     std::string error;
@@ -888,10 +851,10 @@ static net::awaitable<void> Context_httpRequest(
         auto host = req[http::field::host];
 
         auto stream = co_await [&]() -> net::awaitable<std::unique_ptr<HttpConnector>> {
-            tcp::resolver& resolver = self.get_resolver();
+            tcp::resolver& resolver = getResolver(ctx);
             auto resolved = co_await resolver.async_resolve(host, scheme, ua);
 
-            beast::tcp_stream init_stream(asioCtx);
+            beast::tcp_stream init_stream(ctx.as_asio_io_context());
             co_await init_stream.async_connect(resolved, ua);
 
             if (opts.timeout) {
@@ -904,11 +867,11 @@ static net::awaitable<void> Context_httpRequest(
 
 #if FISHNETS_ENABLE_SSL
             if (sslCtx) {
-                co_return std::make_unique<HttpConnectorSsl>(std::move(init_stream), sslCtx->impl().ctx);
+                co_return std::make_unique<HttpConnectorSsl>(ctx.get_executor(), std::move(init_stream), sslCtx->impl().ctx);
             }
 #endif
 
-            co_return std::make_unique<HttpConnectorTcp>(std::move(init_stream));
+            co_return std::make_unique<HttpConnectorTcp>(ctx.get_executor(), std::move(init_stream));
         }();
 
         co_await stream->handshake(host);
@@ -1016,7 +979,7 @@ request_t requestFromDesc(const HttpRequestDesc& desc) {
 } // namespace
 
 void makeHttpRequest(
-    Context& ctx,
+    xeq::context& ctx,
     const HttpRequestDesc& desc,
     ConstHttpMsgBody body,
     HttpResponseHandlerPtr handler,
@@ -1029,15 +992,15 @@ void makeHttpRequest(
     }
 
     net::co_spawn(
-        ctx.impl().ctx,
+        ctx.as_asio_io_context(),
         Context_httpRequest<false>(
-            ctx.impl(), std::move(req), std::move(body), handler->getOptions(), handler, {}, sslCtx),
+            ctx, std::move(req), std::move(body), handler->getOptions(), handler, {}, sslCtx),
         net::detached
     );
 }
 
 void makeSimpleHttpRequest(
-    Context& ctx,
+    xeq::context& ctx,
     const HttpRequestDesc& desc,
     ConstHttpMsgBody body,
     SimpleHttpRequestCb cb,
@@ -1051,48 +1014,11 @@ void makeSimpleHttpRequest(
     }
 
     net::co_spawn(
-        ctx.impl().ctx,
+        ctx.as_asio_io_context(),
         Context_httpRequest<true>(
-            ctx.impl(), std::move(req), std::move(body), std::move(opts), {}, std::move(cb), sslCtx),
+            ctx, std::move(req), std::move(body), std::move(opts), {}, std::move(cb), sslCtx),
         net::detached
     );
-}
-
-ExecutorPtr Context::makeExecutor() {
-    return itlib::make_shared(Executor{make_strand(m_impl->ctx)});
-}
-
-void post(Executor& e, Task task) {
-    post(e.ex, std::move(task));
-}
-
-Timer::Timer() = default;
-Timer::~Timer() = default; // export vtable
-
-struct TimerImpl final : public Timer {
-public:
-    net::steady_timer m_timer;
-
-    explicit TimerImpl(Executor& ex) : m_timer(ex.ex) {}
-
-    virtual void expireAfter(std::chrono::milliseconds timeFromNow) override {
-        m_timer.expires_after(timeFromNow);
-    }
-
-    virtual void cancel() override {
-        m_timer.cancel();
-    }
-    virtual void cancelOne() override {
-        m_timer.cancel_one();
-    }
-
-    virtual void addCallback(Cb cb) override {
-        m_timer.async_wait(std::move(cb));
-    }
-};
-
-TimerPtr Timer::create(const ExecutorPtr& ex) {
-    return std::make_unique<TimerImpl>(*ex);
 }
 
 } // namespace fishnets

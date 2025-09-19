@@ -36,7 +36,7 @@ public:
     // thus capturing [this] or members by ref, when posting from a handler, is safe
     void postWsIoTask(Task task);
 
-    const ExecutorPtr& wsExecutor() const { return m_executor; }
+    const xeq::executor_ptr& wsExecutor() const { return m_executor; }
 
 protected:
     WsSessionHandler();
@@ -93,7 +93,7 @@ private:
     virtual void onConnected(WebSocketPtr ws, std::string_view target) final override;
 
     WebSocketPtr m_ws;
-    ExecutorPtr m_executor;
+    xeq::executor_ptr m_executor;
 
     // helper for the contract of not calling op callbacks after wsClosed
     struct CloseStatus {

@@ -1,7 +1,7 @@
 // Copyright (c) Borislav Stanimirov
 // SPDX-License-Identifier: MIT
 //
-#include <fishnets/Context.hpp>
+#include <xeq/context.hpp>
 #include <fishnets/SslContext.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
 #include <fishnets/WsConnect.hpp>
@@ -86,7 +86,7 @@ public:
 };
 
 TEST_CASE("websocket.org echo async") {
-    fishnets::Context ctx;
+    xeq::context ctx;
     fishnets::SslContext sslCtx;
 
     auto session = std::make_shared<EchoSession>();

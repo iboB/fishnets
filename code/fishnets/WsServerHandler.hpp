@@ -8,7 +8,6 @@
 
 namespace fishnets {
 
-class Context;
 struct EndpointInfo;
 
 namespace impl {
@@ -27,7 +26,6 @@ public:
     // valid on any thread
     void stop();
 private:
-    friend class Context;
     friend class impl::WsServer;
     std::weak_ptr<impl::WsServer> m_server;
 };

@@ -8,13 +8,14 @@
 #include <span>
 #include <string_view>
 
+namespace xeq { class context; }
+
 namespace fishnets {
 
-class Context;
 class SslContext;
 
 FISHNETS_API void wsConnect(
-    Context& ctx,
+    xeq::context& ctx,
     WsConnectionHandlerPtr handler,
     std::span<const EndpointInfo> endpoints,
     std::string_view target = "/",
@@ -22,7 +23,7 @@ FISHNETS_API void wsConnect(
 );
 
 void wsConnect(
-    Context& ctx,
+    xeq::context& ctx,
     WsConnectionHandlerPtr handler,
     const EndpointInfo& endpoint,
     std::string_view target = "/",
@@ -32,7 +33,7 @@ void wsConnect(
 }
 
 FISHNETS_API void wsConnect(
-    Context& ctx,
+    xeq::context& ctx,
     WsConnectionHandlerPtr handler,
     std::string_view url,
     SslContext* sslCtx = nullptr

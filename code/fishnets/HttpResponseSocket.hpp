@@ -3,7 +3,7 @@
 //
 #pragma once
 #include "API.h"
-#include "ExecutorPtr.hpp"
+#include <xeq/executor_ptr.hpp>
 #include <itlib/ufunction.hpp>
 #include <itlib/expected.hpp>
 #include <string>
@@ -39,13 +39,13 @@ public:
     // call to initiate the close of the session
     virtual void close() = 0;
 
-    const ExecutorPtr& executor() const { return m_executor; }
+    const xeq::executor_ptr& executor() const { return m_executor; }
 private:
     // sealed interface
     HttpResponseSocket();
     friend struct HttpResponseSocketImpl;
 
-    ExecutorPtr m_executor;
+    xeq::executor_ptr m_executor;
 };
 
 } // namespace fishnets

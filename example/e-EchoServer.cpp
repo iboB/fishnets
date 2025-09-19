@@ -1,7 +1,7 @@
 // Copyright (c) Borislav Stanimirov
 // SPDX-License-Identifier: MIT
 //
-#include <fishnets/Context.hpp>
+#include <xeq/context.hpp>
 #include <fishnets/WsServerHandler.hpp>
 #include <fishnets/WsServe.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
@@ -47,7 +47,7 @@ class EchoServerSession final : public fishnets::WsSessionHandler {
 #include "ServerCertificate.inl"
 
 int main() {
-    fishnets::Context ctx;
+    xeq::context ctx;
 
     wsServe(
         ctx,

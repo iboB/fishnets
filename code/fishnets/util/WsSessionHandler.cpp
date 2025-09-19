@@ -3,7 +3,7 @@
 //
 #include "WsSessionHandler.hpp"
 #include "../EndpointInfo.hpp"
-#include "../Post.hpp"
+#include <xeq/executor.hpp>
 #include <cstdio>
 #include <stdexcept>
 
@@ -13,7 +13,7 @@ WsSessionHandler::WsSessionHandler() = default;
 WsSessionHandler::~WsSessionHandler() = default;
 
 void WsSessionHandler::postWsIoTask(Task task) {
-    post(m_executor, [pl = shared_from_this(), task = std::move(task)]() {
+    m_executor->post([pl = shared_from_this(), task = std::move(task)]() {
         task();
     });
 }

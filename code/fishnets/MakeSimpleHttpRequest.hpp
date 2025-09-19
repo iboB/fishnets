@@ -9,15 +9,16 @@
 #include <itlib/expected.hpp>
 #include <itlib/ufunction.hpp>
 
+namespace xeq { class context; }
+
 namespace fishnets {
 
-class Context;
 class SslContext;
 
 using SimpleHttpRequestCb = itlib::ufunction<void(itlib::expected<std::string, std::string>)>;
 
 FISHNETS_API void makeSimpleHttpRequest(
-    Context& ctx,
+    xeq::context& ctx,
     const HttpRequestDesc& desc,
     ConstHttpMsgBody body,
     SimpleHttpRequestCb cb,

@@ -25,6 +25,7 @@ target_link_libraries(fishnets
     PUBLIC
         splat::splat
         itlib::itlib
+        xeq::xeq
 )
 
 if(fishnetsHaveSsl)

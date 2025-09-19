@@ -7,12 +7,14 @@
 #include "HttpMsgBody.hpp"
 #include "HttpResponseHandlerPtr.hpp"
 
+namespace xeq { class context; }
+
 namespace fishnets {
 
-class Context;
 class SslContext;
 
 FISHNETS_API void makeHttpRequest(
+    xeq::context& ctx,
     const HttpRequestDesc& desc,
     ConstHttpMsgBody body,
     HttpResponseHandlerPtr handler,

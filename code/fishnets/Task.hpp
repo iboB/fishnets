@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT
 //
 #pragma once
-#include <itlib/ufunction.hpp>
+#include <xeq/ufunc.hpp>
 
 namespace fishnets {
-using Task = itlib::ufunction<void()>;
+using Task = xeq::ufunc<void()>;
 } // namespace fishnets
