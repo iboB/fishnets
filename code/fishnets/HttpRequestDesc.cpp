@@ -32,7 +32,7 @@ HttpRequestDesc::HttpRequestDesc(
     Scheme scheme,
     std::string host,
     std::string target,
-    HeaderFields fields
+    HttpHeaderFields fields
 )
     : method(std::move(method))
     , scheme(scheme)
@@ -47,7 +47,7 @@ HttpRequestDesc::HttpRequestDesc(
     std::string host,
     uint16_t port,
     std::string target,
-    HeaderFields fields
+    HttpHeaderFields fields
 ) : HttpRequestDesc(
         method,
         scheme,
@@ -57,13 +57,13 @@ HttpRequestDesc::HttpRequestDesc(
     )
 {}
 
-HttpRequestDesc::HttpRequestDesc(std::string method, std::string_view url, HeaderFields fields)
+HttpRequestDesc::HttpRequestDesc(std::string method, std::string_view url, HttpHeaderFields fields)
     : fields(std::move(fields))
 {
     setFromMethodUrl(*this, method, url);
 }
 
-HttpRequestDesc::HttpRequestDesc(std::string_view request, HeaderFields fields)
+HttpRequestDesc::HttpRequestDesc(std::string_view request, HttpHeaderFields fields)
     : fields(std::move(fields))
 {
     auto space = request.find(' ');

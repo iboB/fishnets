@@ -3,6 +3,7 @@
 //
 #pragma once
 #include "API.h"
+#include "HttpHeaderFields.hpp"
 #include <string>
 #include <cstdint>
 #include <string_view>
@@ -25,13 +26,7 @@ struct FISHNETS_API HttpRequestDesc {
     std::string target;
 
     // the rest are optional
-    struct HeaderFields {
-        std::string userAgent;
-        std::string contentType;
-        std::string accept;
-        bool keepAlive = false; // note that false here means omitting the header field
-    };
-    HeaderFields fields;
+    HttpHeaderFields fields;
 
     // constructors are intentionally implicit
     HttpRequestDesc(
@@ -39,7 +34,7 @@ struct FISHNETS_API HttpRequestDesc {
         Scheme scheme,
         std::string host,
         std::string target,
-        HeaderFields fields = {}
+        HttpHeaderFields fields = {}
     );
     HttpRequestDesc(
         std::string method,
@@ -47,10 +42,10 @@ struct FISHNETS_API HttpRequestDesc {
         std::string host,
         uint16_t port,
         std::string target,
-        HeaderFields fields = {}
+        HttpHeaderFields fields = {}
     );
-    HttpRequestDesc(std::string method, std::string_view url, HeaderFields fields = {});
-    HttpRequestDesc(std::string_view request, HeaderFields fields = {});
+    HttpRequestDesc(std::string method, std::string_view url, HttpHeaderFields fields = {});
+    HttpRequestDesc(std::string_view request, HttpHeaderFields fields = {});
 };
 
 } // namespace fishnets
