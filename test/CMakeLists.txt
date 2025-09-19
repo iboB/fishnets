@@ -1,7 +1,7 @@
 # Copyright (c) Borislav Stanimirov
 # SPDX-License-Identifier: MIT
 #
-CPMAddPackage(gh:iboB/doctest-util@0.1.2)
+CPMAddPackage(gh:iboB/doctest-util@0.1.4)
 
 if(fishnetsHaveSsl)
     add_library(fishnets-TestSslCtx STATIC TestSslCtx.cpp)

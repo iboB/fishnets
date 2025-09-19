@@ -39,7 +39,7 @@ endif()
 
 #######################################
 # packages
-CPMAddPackage(gh:iboB/splat@1.3.3)
+CPMAddPackage(gh:iboB/splat@1.3.4)
 CPMAddPackage("gh:iboB/itlib@1.11.7a#cba8b3b")
 
 find_package(Threads REQUIRED)
