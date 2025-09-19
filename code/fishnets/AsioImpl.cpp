@@ -757,7 +757,7 @@ struct HttpResponseSocketT final : public HttpResponseSocketImpl {
         };
 
         m_dataBuf = span;
-        auto body = m_parser.get().body();
+        auto& body = m_parser.get().body();
         body.data = m_dataBuf.data();
         body.size = m_dataBuf.size();
         http::async_read(m_stream, m_flatBuf, m_parser, std::move(onRead));
