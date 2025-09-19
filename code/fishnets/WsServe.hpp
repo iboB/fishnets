@@ -19,7 +19,7 @@ FISHNETS_API void wsServe(
     WsServerHandlerPtr handler,
     SslContext* sslCtx = nullptr
 );
-void wsServe(
+inline void wsServe(
     xeq::context& ctx,
     const EndpointInfo& endpoint,
     WsServerHandlerPtr handler,

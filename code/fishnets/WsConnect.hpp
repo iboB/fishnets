@@ -22,7 +22,7 @@ FISHNETS_API void wsConnect(
     SslContext* sslCtx = nullptr
 );
 
-void wsConnect(
+inline void wsConnect(
     xeq::context& ctx,
     WsConnectionHandlerPtr handler,
     const EndpointInfo& endpoint,
