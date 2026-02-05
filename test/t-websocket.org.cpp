@@ -28,7 +28,7 @@ const std::vector<Packet> Test_Packets = {
 };
 
 
-class EchoSession : public fishnets::WsSessionHandler {
+class EchoSession final : public fishnets::WsSessionHandler {
 public:
     std::optional<std::deque<Packet>> packets;
 
@@ -51,23 +51,24 @@ public:
         }
     }
 
-    void wsReceivedBinary(std::span<uint8_t> binary, bool complete) {
+    void wsReceivedBinary(std::span<std::byte> binary, bool complete) override {
         CHECK(complete);
         auto& packet = packets->front();
         CHECK(packet.binary());
         std::span expected(packet.blob);
-        CHECK(std::equal(binary.begin(), binary.end(), expected.begin(), expected.end()));
+        CHECK(std::equal(binary.begin(), binary.end(), expected.begin(), expected.end(),
+            [](std::byte b, uint8_t e) { return b == std::byte(e); }
+        ));
         packets->pop_front();
         trySendNext();
     }
 
-    void wsReceivedText(std::span<char> text, bool complete) {
+    void wsReceivedText(std::span<char> text, bool complete) override {
         CHECK(complete);
         std::string_view sv(text.data(), text.size());
         if (!packets) {
             // we received the greeting from websocket.org
             CHECK(sv.starts_with("Request served by "));
-
             packets.emplace(Test_Packets.begin(), Test_Packets.end());
         }
         else {
@@ -92,4 +93,6 @@ TEST_CASE("websocket.org echo async") {
     auto session = std::make_shared<EchoSession>();
     wsConnect(ctx, session, "wss://echo.websocket.org", &sslCtx);
     ctx.run();
+    REQUIRE(session->packets);
+    CHECK(session->packets->empty());
 }
