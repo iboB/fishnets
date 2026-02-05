@@ -798,7 +798,7 @@ struct HttpConnectorT : public HttpConnector {
         return http::async_read_header(m_stream, buf, parser, ua);
     }
 
-    virtual net::awaitable<size_t> readFullBody(beast::flat_buffer& buf, http::response_parser<http::string_body>& parser) {
+    virtual net::awaitable<size_t> readFullBody(beast::flat_buffer& buf, http::response_parser<http::string_body>& parser) final override {
         return http::async_read(m_stream, buf, parser, ua);
     }
 
