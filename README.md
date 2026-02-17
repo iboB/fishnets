@@ -12,4 +12,4 @@ This software is distributed under the MIT Software License.
 
 See accompanying file LICENSE or copy [here](https://opensource.org/licenses/MIT).
 
-Copyright &copy; 2021-2025 [Borislav Stanimirov](http://github.com/iboB)
+Copyright &copy; 2021-2026 [Borislav Stanimirov](http://github.com/iboB)
