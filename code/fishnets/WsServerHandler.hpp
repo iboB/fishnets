@@ -18,12 +18,19 @@ class FISHNETS_API WsServerHandler {
 public:
     virtual ~WsServerHandler();
 
+    // caled when a new connection
+    // returning nullptr rejects the connection, otherwise the handler is used to handle the connection
     virtual WsConnectionHandlerPtr onAccept(const EndpointInfo& local, const EndpointInfo& remote) = 0;
 
+    // called on accept errors, non fatal
+    // server continues serving and accepting new connections after this, but the failed connection will be closed
     // the default implementation logs to stderr
     virtual void onError(std::string msg);
 
     // valid on any thread
+    // stop accepting new sessions
+    // note that this doesn't affect existing accepted sessions
+    // they will continue to run until they are manually closed or their associated executors are stopped
     void stop();
 private:
     friend class impl::WsServer;

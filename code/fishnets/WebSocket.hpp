@@ -14,6 +14,10 @@ namespace fishnets {
 struct EndpointInfo;
 struct WebSocketOptions;
 
+// WebSocket interface
+// the associated executor is always a strand
+// all methdos are only valid on the socket strand, except for executor() which is valid on any thread
+// all callbacks are executed on the socket strand
 class FISHNETS_API WebSocket {
 public:
     virtual ~WebSocket();

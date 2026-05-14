@@ -10,7 +10,9 @@ struct HttpHeaderFields {
     std::string userAgent;
     std::string contentType;
     std::string accept;
-    bool keepAlive = false; // note that false here means omitting the header field
+
+    // note that false here means omitting the 'keep-alive' header field from the request
+    bool keepAlive = false;
 };
 
 } // namespace fishnets

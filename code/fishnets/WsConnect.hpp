@@ -14,6 +14,7 @@ namespace fishnets {
 
 class SslContext;
 
+// try to connect to the provided endpoints in order, until a connection is established or the list is exhausted
 FISHNETS_API void wsConnect(
     xeq::context& ctx,
     WsConnectionHandlerPtr handler,
@@ -22,6 +23,7 @@ FISHNETS_API void wsConnect(
     SslContext* sslCtx = nullptr
 );
 
+// try to connect to a single endpoint
 inline void wsConnect(
     xeq::context& ctx,
     WsConnectionHandlerPtr handler,
@@ -32,6 +34,7 @@ inline void wsConnect(
     wsConnect(ctx, std::move(handler), {&endpoint, 1}, target, sslCtx);
 }
 
+// try to connect to a single endpoint provided as a url
 FISHNETS_API void wsConnect(
     xeq::context& ctx,
     WsConnectionHandlerPtr handler,
