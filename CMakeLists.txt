@@ -39,8 +39,8 @@ endif()
 
 #######################################
 # packages
-CPMAddPackage(gh:iboB/splat@1.3.4)
-CPMAddPackage(gh:iboB/itlib@1.11.8)
+CPMAddPackage(gh:iboB/splat@1.3.5)
+CPMAddPackage(gh:iboB/itlib@1.12.2)
 
 find_package(Threads REQUIRED)
 set(fishnetsHaveSsl FALSE)
@@ -74,7 +74,7 @@ if(NOT TARGET Boost::beast)
     add_library(Boost::beast ALIAS Boost::boost)
 endif()
 
-CPMAddPackage(gh:iboB/furi@1.2.1)
+CPMAddPackage(gh:iboB/furi@1.2.2)
 CPMAddPackage(gh:iboB/xeq@0.1.0)
 
 #######################################
