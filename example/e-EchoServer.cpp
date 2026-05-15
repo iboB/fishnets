@@ -52,8 +52,8 @@ int main() {
     wsServe(
         ctx,
         {fishnets::IPv4, 7654},
-        std::make_shared<fishnets::SimpleServerHandler>([](const fishnets::EndpointInfo&, const fishnets::EndpointInfo&) {
-            return std::make_shared<EchoServerSession>();
+        std::make_shared<fishnets::SimpleServerHandler>([](fishnets::WsServerConnectionPtr c) {
+            c->accept(std::make_shared<EchoServerSession>());
         })
     );
 

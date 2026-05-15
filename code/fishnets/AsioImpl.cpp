@@ -8,6 +8,7 @@
 
 #include "WebSocket.hpp"
 #include "WsConnectionHandler.hpp"
+#include "WsServerConnection.hpp"
 #include "WsServerHandler.hpp"
 #include "WebSocketOptions.hpp"
 
@@ -130,6 +131,9 @@ struct WebSocketImpl : public WebSocket {
     beast::flat_buffer m_growableBuf;
     ByteSpan m_userBuf;
 };
+
+WsServerConnection::WsServerConnection() = default;
+WsServerConnection::~WsServerConnection() = default;
 
 namespace {
 
@@ -462,6 +466,70 @@ struct ClientConnectorSsl final : public ClientConnectorT<RawWsSsl> {
 
 } // namespace
 
+
+class WsServerConnectionImpl final : public WsServerConnection {
+public:
+    EndpointInfo m_localEndpoint;
+    xeq::executor_ptr m_executor;
+    tcp::socket m_socket;
+    SslContext* m_sslCtx;
+
+    WsServerConnectionImpl(
+        EndpointInfo localEndpoint,
+        xeq::executor_ptr ex,
+        tcp::socket socket,
+        SslContext* sslCtx
+    )
+        : m_localEndpoint(localEndpoint)
+        , m_executor(std::move(ex))
+        , m_socket(std::move(socket))
+        , m_sslCtx(sslCtx)
+    {}
+
+    virtual const EndpointInfo& localEndpointInfo() const noexcept override {
+        return m_localEndpoint;
+    }
+    virtual EndpointInfo getRemoteEndpointInfo() const noexcept override {
+        return getEndpointInfoOf(m_socket).value_or(EndpointInfo{});
+    }
+
+    virtual void reject() override {
+        assert(m_executor); // only one accept or reject must be made
+        if (!m_executor) return; // already rejected or accepted
+        m_executor = {};
+
+        auto e = make_error_code(net::error::connection_refused);
+        m_socket.shutdown(tcp::socket::shutdown_both, e);
+        m_socket.close(e);
+    }
+
+    virtual void accept(WsConnectionHandlerPtr handler) override {
+        if (!handler) {
+            reject();
+            return;
+        }
+
+        assert(m_executor); // only one accept or reject must be made
+        if (!m_executor) return; // already rejected or accepted
+
+        std::shared_ptr<ServerConnector> con;
+
+#if FISHNETS_ENABLE_SSL
+        if (m_sslCtx) {
+            con = std::make_shared<ServerConnectorSsl>(std::move(m_executor), RawWsSsl(std::move(m_socket), m_sslCtx->impl().ctx));
+        }
+        else
+#endif
+        {
+            con = std::make_shared<ServerConnectorWs>(std::move(m_executor), RawWs(std::move(m_socket)));
+        }
+
+        con->setInitialOptions(handler->getInitialOptions());
+        con->m_handler = std::move(handler);
+        con->accept();
+    }
+};
+
 namespace impl {
 class WsServer : public itlib::enable_shared_from {
 public:
@@ -513,45 +581,19 @@ public:
     }
 
     void onAccept(tcp::acceptor& a, beast::error_code e, xeq::executor_ptr socketEx, tcp::socket socket) {
-        auto localEndpoint = EndpointInfo_fromTcp(a.local_endpoint());
-
         if (e) {
             m_handler->m_server = {};
             m_handler->onError(e.message());
             return;
         }
 
-        // init session handler
-        auto ep = getEndpointInfoOf(socket);
-        if (!ep) {
-            m_handler->onError("socket disconnected while accepting");
-            doAccept(a);
-            return;
-        }
-
-        auto conHandler = m_handler->onAccept(localEndpoint, *ep);
-
-        if (!conHandler) {
-            m_handler->onError("session declined");
-            doAccept(a);
-            return;
-        }
-
-        std::shared_ptr<ServerConnector> con;
-
-#if FISHNETS_ENABLE_SSL
-        if (m_sslCtx) {
-            con = std::make_shared<ServerConnectorSsl>(std::move(socketEx), RawWsSsl(std::move(socket), m_sslCtx->impl().ctx));
-        }
-        else
-#endif
-        {
-            con = std::make_shared<ServerConnectorWs>(std::move(socketEx), RawWs(std::move(socket)));
-        }
-
-        con->setInitialOptions(conHandler->getInitialOptions());
-        con->m_handler = std::move(conHandler);
-        con->accept();
+        auto connection = std::make_unique<WsServerConnectionImpl>(
+            EndpointInfo_fromTcp(a.local_endpoint()),
+            std::move(socketEx),
+            std::move(socket),
+            m_sslCtx
+        );
+        m_handler->onAccept(std::move(connection));
 
         // accept more sessions
         doAccept(a);

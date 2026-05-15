@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 //
 #pragma once
-#include "WsConnectionHandlerPtr.hpp"
+#include "WsServerConnection.hpp"
 #include <functional>
 #include <string>
 
@@ -18,9 +18,8 @@ class FISHNETS_API WsServerHandler {
 public:
     virtual ~WsServerHandler();
 
-    // caled when a new connection
-    // returning nullptr rejects the connection, otherwise the handler is used to handle the connection
-    virtual WsConnectionHandlerPtr onAccept(const EndpointInfo& local, const EndpointInfo& remote) = 0;
+    // called when a new connection is attempted
+    virtual void onAccept(WsServerConnectionPtr connection) = 0;
 
     // called on accept errors, non fatal
     // server continues serving and accepting new connections after this, but the failed connection will be closed
@@ -39,14 +38,13 @@ private:
 
 class SimpleServerHandler : public WsServerHandler {
 public:
-    using ConnectionHandlerFactory
-        = std::function<WsConnectionHandlerPtr(const EndpointInfo& local, const EndpointInfo& remote)>;
-    ConnectionHandlerFactory factory;
+    using AcceptFunc = std::function<void(WsServerConnectionPtr)>;
+    AcceptFunc accept;
 
-    SimpleServerHandler(ConnectionHandlerFactory f) : factory(std::move(f)) {}
+    SimpleServerHandler(AcceptFunc f) : accept(std::move(f)) {}
 
-    virtual WsConnectionHandlerPtr onAccept(const EndpointInfo& local, const EndpointInfo& remote) override {
-        return factory(local, remote);
+    virtual void onAccept(WsServerConnectionPtr connection) final override {
+        accept(std::move(connection));
     }
 };
 } // namespace fishnets

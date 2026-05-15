@@ -214,11 +214,11 @@ struct TestServer {
         wsServeLocalhost(
             m_ctx,
             Test_Port,
-            std::make_shared<fishnets::SimpleServerHandler>([this](const fishnets::EndpointInfo& local, const fishnets::EndpointInfo remote) {
-                CHECK(local.address == "127.0.0.1");
-                CHECK(local.port == Test_Port);
-                CHECK(remote.address == "127.0.0.1");
-                return std::make_shared<SessionType>(Role::Server, m_freeSessionId++);
+            std::make_shared<fishnets::SimpleServerHandler>([this](fishnets::WsServerConnectionPtr c) {
+                CHECK(c->localEndpointInfo().address == "127.0.0.1");
+                CHECK(c->localEndpointInfo().port == Test_Port);
+                CHECK(c->getRemoteEndpointInfo().address == "127.0.0.1");
+                c->accept(std::make_shared<SessionType>(Role::Server, m_freeSessionId++));
             }),
             m_sslCtx.get()
         );
