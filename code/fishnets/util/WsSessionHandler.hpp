@@ -5,8 +5,8 @@
 #include "../API.h"
 #include "../WebSocket.hpp"
 #include "../WsConnectionHandler.hpp"
-#include "../Task.hpp"
 
+#include <xeq/ufunc.hpp>
 #include <itlib/shared_from.hpp>
 #include <string_view>
 #include <optional>
@@ -34,6 +34,7 @@ public:
     // ONLY CALL the other ws* functions from within a posted task
     // posting a task will extend the lifetime of the posting handler until the task is complete
     // thus capturing [this] or members by ref, when posting from a handler, is safe
+    using Task = xeq::ufunc<void()>;
     void postWsIoTask(Task task);
 
     const xeq::executor_ptr& wsExecutor() const { return m_executor; }
