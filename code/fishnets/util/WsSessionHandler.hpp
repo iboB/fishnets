@@ -44,6 +44,13 @@ protected:
     // intentionally not virtual. Objects are not owned through this, but instead through shared pointers
     ~WsSessionHandler();
 
+    // with autoReceive, after each successful receive, another one is automatically initiated
+    // this can be changed at any time and will affect the next possible receive operation
+    // note that simply setting this does not initiate a receive
+    // if you want a receive loop from the get go, set this to true and call wsReceive in wsOpened
+    void wsSetAutoReceive(bool set = true) { m_autoReceive = set; }
+    bool wsIsAutoReceiving() const { return m_autoReceive; }
+
     // called on connection errors before wsOpened
     // once wsOpened is called this can never get called, instead wsClosed will be called
     // this comes from WsConnectionHandler and you can override it if you want to handle connection errors
@@ -112,6 +119,8 @@ private:
         Type close = none;
     };
     CloseStatus m_closeStatus;
+
+    bool m_autoReceive = false;
 
     void doSend(WebSocket::ConstPacket packet);
     void tryCallWsClosed();

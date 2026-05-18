@@ -148,6 +148,8 @@ class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSes
     void wsOpened(std::string_view target) override {
         m_seqCheck = makeSeqCheck(m_id % 2 == 1);
         checkOpen(target, wsGetEndpointInfo());
+
+        wsSetAutoReceive(true);
         wsReceive();
     }
 
@@ -159,7 +161,6 @@ class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSes
         sendQueue.push_back(receivedIndex);
         ++receivedIndex;
         send();
-        wsReceive();
     }
 
     void wsReceivedText(std::span<char> text, bool complete) override {
@@ -171,7 +172,6 @@ class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSes
         sendQueue.push_back(receivedIndex);
         ++receivedIndex;
         send();
-        wsReceive();
     }
 
     void send() {

@@ -65,6 +65,7 @@ void WsSessionHandler::wsReceive(WebSocket::ByteSpan buf) {
     m_ws->recv(buf, [this, pl = shared_from_this()](WebSocket::Result<WebSocket::Packet> res) {
         if (res) {
             m_closeStatus.recv = CloseStatus::none; // can receive again
+
             if (res->text) {
                 static_assert(sizeof(char) == sizeof(*res->data.data()));
                 std::span<char> text{reinterpret_cast<char*>(res->data.data()), res->data.size()};
@@ -72,6 +73,10 @@ void WsSessionHandler::wsReceive(WebSocket::ByteSpan buf) {
             }
             else {
                 wsReceivedBinary(res->data, res->complete);
+            }
+
+            if (m_autoReceive) {
+                wsReceive();
             }
         }
         else {
