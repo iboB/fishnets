@@ -16,7 +16,7 @@ namespace fishnets {
 struct WebSocketOptions;
 struct EndpointInfo;
 
-// utility class for handling a websocket session
+// utility class for handling a WebSocket session
 // wraps a WebSocket object and provides a callback interface for handling the session
 class FISHNETS_API WsSessionHandler : public WsConnectionHandler, public itlib::enable_shared_from {
 public:
