@@ -18,6 +18,8 @@ public:
     // but it helps us export the vtable
     virtual ~WsConnectionHandler();
 
+    // all overridable methods below are invoked on the WebSocket strand
+
     virtual void onConnected(WebSocketPtr ws, std::string_view target) = 0;
 
     // the default implementation logs to stderr
