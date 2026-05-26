@@ -29,6 +29,7 @@ macro(dual_test test)
 endmacro()
 
 dual_test(ws-SimpleClientServer)
+dual_test(ws-ClientReconnect)
 ssl_test(websocket.org)
 
 non_ssl_test(HttpRequestDesc)
