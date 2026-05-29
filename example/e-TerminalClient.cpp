@@ -3,6 +3,7 @@
 //
 #include <xeq/context.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
+#include <fishnets/WsConnectionHandler.hpp>
 #include <fishnets/WsConnect.hpp>
 
 #include <atomic>
@@ -12,8 +13,7 @@
 #include <cassert>
 
 
-class Session final : public fishnets::WsSessionHandler
-{
+class Session final : public fishnets::WsConnectionHandler, public fishnets::WsSessionHandler {
 public:
     std::atomic_bool active = true;
 
@@ -43,7 +43,8 @@ private:
         wsSend(*m_curPacket);
     }
 
-    void wsOpened(std::string_view) override {
+    void onConnected(fishnets::WebSocketPtr ws, std::string_view) override {
+        wsAttach(std::move(ws));
         wsReceive();
     }
 
@@ -73,8 +74,7 @@ private:
     std::optional<std::string> m_curPacket;
 };
 
-int main()
-{
+int main() {
     xeq::context ctx;
     auto session = std::make_shared<Session>();
 

@@ -4,13 +4,15 @@
 #include <xeq/context.hpp>
 #include <fishnets/SslContext.hpp>
 #include <fishnets/WsConnect.hpp>
+#include <fishnets/WsConnectionHandler.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
 
 #include <iostream>
 
 // session which sends a single frame, receives a single frame and then closes the connection
-class OneshotSession final : public fishnets::WsSessionHandler {
-    void wsOpened(std::string_view target) override {
+class OneshotSession final : public fishnets::WsConnectionHandler, public fishnets::WsSessionHandler {
+    void onConnected(fishnets::WebSocketPtr ws, std::string_view target) override {
+        wsAttach(std::move(ws));
         auto ep = wsGetEndpointInfo();
         std::cout << "Connected to: " << ep.address << ':' << ep.port << target << '\n';
         m_msg = "cool message";

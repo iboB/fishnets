@@ -4,13 +4,15 @@
 #include <xeq/context.hpp>
 #include <fishnets/WsServerHandler.hpp>
 #include <fishnets/WsServe.hpp>
+#include <fishnets/WsConnectionHandler.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
 
 #include <iostream>
 #include <thread>
 
-class EchoServerSession final : public fishnets::WsSessionHandler {
-    void wsOpened(std::string_view target) override {
+class EchoServerSession final : public fishnets::WsConnectionHandler, public fishnets::WsSessionHandler {
+    void onConnected(fishnets::WebSocketPtr ws, std::string_view target) override {
+        wsAttach(std::move(ws));
         auto ep = wsGetEndpointInfo();
         std::cout << "New session from to '" << target << "' from " << ep.address << ':' << ep.port << '\n';
         wsReceive();

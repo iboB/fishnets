@@ -6,6 +6,7 @@
 #include "TestSeqCheck.hpp"
 
 #include <fishnets/WsServerHandler.hpp>
+#include <fishnets/WsConnectionHandler.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
 #include <fishnets/WsServe.hpp>
 #include <fishnets/WsConnect.hpp>
@@ -61,7 +62,7 @@ enum class Role {
     Server
 };
 
-class BasicSession {
+class BasicSession : public fishnets::WsConnectionHandler, public fishnets::WsSessionHandler {
 public:
     BasicSession(Role role, uint32_t id)
         : m_role(role)
@@ -81,9 +82,17 @@ protected:
         }
         CHECK(target == SessionTargetFixture::target);
     }
+
+    // connection handler
+    void onConnected(fishnets::WebSocketPtr ws, std::string_view target) override {
+        wsAttach(std::move(ws));
+        run(target);
+    }
+
+    virtual void run(std::string_view target) = 0;
 };
 
-class TestSenderSession final : public fishnets::WsSessionHandler, public BasicSession {
+class TestSenderSession final : public BasicSession {
     using BasicSession::BasicSession;
 
     void sendNext() {
@@ -98,7 +107,7 @@ class TestSenderSession final : public fishnets::WsSessionHandler, public BasicS
         }
     }
 
-    void wsOpened(std::string_view target) override {
+    void run(std::string_view target) override {
         checkOpen(target, wsGetEndpointInfo());
 
         sendNext();
@@ -142,10 +151,10 @@ class TestSenderSession final : public fishnets::WsSessionHandler, public BasicS
     size_t receivedIndex = 0;
 };
 
-class TestEchoSession final : public fishnets::WsSessionHandler, public BasicSession {
+class TestEchoSession final : public BasicSession {
     using BasicSession::BasicSession;
 
-    void wsOpened(std::string_view target) override {
+    void run(std::string_view target) override {
         m_seqCheck = makeSeqCheck(m_id % 2 == 1);
         checkOpen(target, wsGetEndpointInfo());
 

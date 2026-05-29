@@ -9,6 +9,7 @@
 #include <fishnets/util/WsSessionHandlerWithSendQueue.hpp>
 #include <fishnets/WsServe.hpp>
 #include <fishnets/WsConnect.hpp>
+#include <fishnets/WsConnectionHandler.hpp>
 
 #include <xeq/context.hpp>
 #include <xeq/thread_runner.hpp>
@@ -20,8 +21,9 @@
 constexpr uint16_t Accept_Port = 7654;
 constexpr uint16_t Deny_Port = 7655;
 
-class EchoSession final : public fishnets::WsSessionHandlerWithSendQueue {
-    void wsOpened(std::string_view) override {
+class EchoSession final : public fishnets::WsConnectionHandler, public fishnets::WsSessionHandlerWithSendQueue {
+    void onConnected(fishnets::WebSocketPtr ws, std::string_view) override {
+        wsAttach(std::move(ws));
         wsSetAutoReceive(true);
         wsReceive();
     }
@@ -79,7 +81,7 @@ struct EchoServer {
 };
 
 
-class TestSession : public fishnets::WsSessionHandler {
+class TestSession : public fishnets::WsConnectionHandler, public fishnets::WsSessionHandler {
 public:
     std::deque<std::string> m_queue;
     const int m_expectedStatus = 0;
@@ -102,7 +104,8 @@ public:
         status = -1;
     }
 
-    void wsOpened(std::string_view) final override {
+    void onConnected(fishnets::WebSocketPtr ws, std::string_view) override {
+        wsAttach(std::move(ws));
         wsSetAutoReceive(true);
         wsReceive();
 

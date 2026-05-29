@@ -9,8 +9,38 @@
 
 namespace fishnets {
 
-WsSessionHandler::WsSessionHandler() = default;
+WsSessionHandler::WsSessionHandler(WebSocketPtr ws) : m_ws(std::move(ws)) {
+    if (m_ws) {
+        m_executor = m_ws->executor();
+    }
+}
+
 WsSessionHandler::~WsSessionHandler() = default;
+
+void WsSessionHandler::wsAttach(WebSocketPtr ws) {
+    if (m_ws) {
+        throw std::runtime_error("WebSocket already attached");
+    }
+    m_ws = std::move(ws);
+
+    assert(!m_executor); // should be set iff m_ws is set
+    m_executor = m_ws->executor();
+}
+
+WebSocketPtr WsSessionHandler::wsDetach() {
+    if (wsHasIoOpsInProgress()) {
+        throw std::runtime_error("Cannot detach WebSocket with active io operations");
+    }
+
+    m_executor = {};
+    return std::move(m_ws);
+}
+
+bool WsSessionHandler::wsHasIoOpsInProgress() const {
+    return m_closeStatus.send == CloseStatus::active
+        || m_closeStatus.recv == CloseStatus::active
+        || m_closeStatus.close == CloseStatus::active;
+}
 
 void WsSessionHandler::postWsIoTask(Task task) {
     m_executor->post([pl = shared_from_this(), task = std::move(task)]() {
@@ -126,14 +156,7 @@ void WsSessionHandler::wsSetOptions(const WebSocketOptions& options) {
     m_ws->setOptions(options);
 }
 
-void WsSessionHandler::onConnected(WebSocketPtr ws, std::string_view target) {
-    m_ws = std::move(ws);
-    m_executor = m_ws->executor();
-    wsOpened(target);
-}
-
 // default implementations
-void WsSessionHandler::wsOpened(std::string_view) {}
 void WsSessionHandler::wsClosed(std::string msg) {
     printf("WebSocket disconnected: %s\n", msg.c_str());
 }

@@ -5,6 +5,7 @@
 #include <fishnets/SslContext.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
 #include <fishnets/WsConnect.hpp>
+#include <fishnets/WsConnectionHandler.hpp>
 
 #include <doctest/doctest.h>
 
@@ -28,11 +29,12 @@ const std::vector<Packet> Test_Packets = {
 };
 
 
-class EchoSession final : public fishnets::WsSessionHandler {
+class EchoSession final : public fishnets::WsConnectionHandler, public fishnets::WsSessionHandler {
 public:
     std::optional<std::deque<Packet>> packets;
 
-    void wsOpened(std::string_view) override {
+    void onConnected(fishnets::WebSocketPtr ws, std::string_view target) override {
+        wsAttach(std::move(ws));
         wsReceive();
     }
 

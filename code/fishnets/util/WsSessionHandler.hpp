@@ -4,7 +4,7 @@
 #pragma once
 #include "../API.h"
 #include "../WebSocket.hpp"
-#include "../WsConnectionHandler.hpp"
+#include "../WebSocketPtr.hpp"
 
 #include <xeq/ufunc.hpp>
 #include <itlib/shared_from.hpp>
@@ -18,16 +18,12 @@ struct EndpointInfo;
 
 // utility class for handling a WebSocket session
 // wraps a WebSocket object and provides a callback interface for handling the session
-class FISHNETS_API WsSessionHandler : public WsConnectionHandler, public itlib::enable_shared_from {
+class FISHNETS_API WsSessionHandler : public itlib::enable_shared_from {
 public:
+    explicit WsSessionHandler(WebSocketPtr ws = {});
+
     WsSessionHandler(const WsSessionHandler&) = delete;
     WsSessionHandler& operator=(const WsSessionHandler&) = delete;
-
-    // will be called on the IO strand shortly after construction to get the initial options.
-    // no calls to the interface are allowed in this function, not even postSessionIoTask
-    // the default implementation returns default-constructed WebSocketOptions
-    // this comes from WsConnectionHandler and you can override it if you want to provide custom initial options
-    // virtual WebSocketOptions getInitialOptions() override;
 
     // post a task to be executed on the io strand of the session
     // THIS IS THE ONLY FUNCTION WHICH IS VALID ON ANY THREAD
@@ -38,29 +34,28 @@ public:
     void postWsIoTask(Task task);
 
     const xeq::executor_ptr& wsExecutor() const { return m_executor; }
-
 protected:
-    WsSessionHandler();
     // intentionally not virtual. Objects are not owned through this, but instead through shared pointers
     ~WsSessionHandler();
+
+    // call to attach a WebSocket to this handler
+    // should only be called once (though it it technically possible to detach and reattach)
+    // only valid if no WebSocket is currently attached
+    void wsAttach(WebSocketPtr ws);
+
+    // call to detach the WebSocket from this handler
+    // only valid if no io operations are in progress (wsReceive, wsSend, wsClose)
+    WebSocketPtr wsDetach();
+
+    // call to check if there are any io operations in progress (wsReceive, wsSend, wsClose)
+    bool wsHasIoOpsInProgress() const;
 
     // with autoReceive, after each successful receive, another one is automatically initiated
     // this can be changed at any time and will affect the next possible receive operation
     // note that simply setting this does not initiate a receive
-    // if you want a receive loop from the get go, set this to true and call wsReceive in wsOpened
+    // if you want a receive loop from the get go, set this to true and call wsReceive after the WebSocket is attached
     void wsSetAutoReceive(bool set = true) { m_autoReceive = set; }
     bool wsIsAutoReceiving() const { return m_autoReceive; }
-
-    // called on connection errors before wsOpened
-    // once wsOpened is called this can never get called, instead wsClosed will be called
-    // this comes from WsConnectionHandler and you can override it if you want to handle connection errors
-    // virtual void onConnectionError(std::string message) override;
-
-    // entrypoint
-    // called when socked connection is established
-    // with the target of the request which initiated the session
-    // io ops (including postIoTask) are only allowed from this point on
-    virtual void wsOpened(std::string_view target);
 
     // called when connection is closed
     // no io callbacks (wsReceived*, wsCompletedSend) will be called after this (calling wsReceive and wsSend is safe)
@@ -98,8 +93,6 @@ protected:
     void wsSetOptions(const WebSocketOptions& options);
 
 private:
-    virtual void onConnected(WebSocketPtr ws, std::string_view target) final override;
-
     WebSocketPtr m_ws;
     xeq::executor_ptr m_executor;
 
