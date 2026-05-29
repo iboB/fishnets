@@ -555,6 +555,10 @@ public:
         }
     }
 
+    ~WsServer() {
+        m_handler->onStopped();
+    }
+
     void start() {
         for (auto& a : m_acceptors) {
             doAccept(a);
@@ -618,6 +622,8 @@ WsServerHandler::~WsServerHandler() = default;
 void WsServerHandler::onError(std::string msg) {
     fprintf(stderr, "WebSocket connection error: %s\n", msg.c_str());
 }
+
+void WsServerHandler::onStopped() {}
 
 void WsServerHandler::stop() {
     auto server = m_server.lock();

@@ -26,6 +26,11 @@ public:
     // the default implementation logs to stderr
     virtual void onError(std::string msg);
 
+    // called when the server is stopped, either by calling stop() or stopping the associated executors
+    // will be invoken on one of the server executors, but which one is not defined
+    // the default implementation does nothing
+    virtual void onStopped();
+
     // valid on any thread
     // stop accepting new sessions
     // note that this doesn't affect existing accepted sessions
