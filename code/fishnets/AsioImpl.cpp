@@ -585,28 +585,29 @@ public:
     }
 
     void onAccept(tcp::acceptor& a, beast::error_code e, xeq::executor_ptr socketEx, tcp::socket socket) {
+        auto endpoint = EndpointInfo_fromTcp(a.local_endpoint());
+
         if (e) {
             m_handler->m_server = {};
-            m_handler->onError(e.message());
+            m_handler->onError(endpoint, e.message());
             return;
         }
 
+        // immediately accept more sessions
+        doAccept(a);
+
         auto connection = std::make_unique<WsServerConnectionImpl>(
-            EndpointInfo_fromTcp(a.local_endpoint()),
+            std::move(endpoint),
             std::move(socketEx),
             std::move(socket),
             m_sslCtx
         );
         m_handler->onAccept(std::move(connection));
-
-        // accept more sessions
-        doAccept(a);
     }
 
     static void serve(xeq::context& ctx, std::span<const tcp::endpoint> eps, WsServerHandlerPtr handler, SslContext* ssl) {
         if (!handler->m_server.expired()) {
-            handler->onError("handler already serving");
-            return;
+            throw std::runtime_error("Handler is already in use by another server");
         }
         auto server = std::make_shared<WsServer>(ctx, handler, eps, ssl);
         handler->m_server = server;
@@ -619,8 +620,8 @@ public:
 
 WsServerHandler::~WsServerHandler() = default;
 
-void WsServerHandler::onError(std::string msg) {
-    fprintf(stderr, "WebSocket connection error: %s\n", msg.c_str());
+void WsServerHandler::onError(const EndpointInfo& local, std::string msg) {
+    fprintf(stderr, "WebSocket accept error on %s:%hu: %s\n", local.address.c_str(), local.port, msg.c_str());
 }
 
 void WsServerHandler::onStopped() {}

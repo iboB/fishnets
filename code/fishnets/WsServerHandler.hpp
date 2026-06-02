@@ -21,10 +21,10 @@ public:
     // called when a new connection is attempted
     virtual void onAccept(WsServerConnectionPtr connection) = 0;
 
-    // called on accept errors, non fatal
-    // server continues serving and accepting new connections after this, but the failed connection will be closed
+    // called on accept errors for a given endpoint
+    // this is a fatal error for the given endpoint (others will continue accepting until stop is called)
     // the default implementation logs to stderr
-    virtual void onError(std::string msg);
+    virtual void onError(const EndpointInfo& local, std::string msg);
 
     // called when the server is stopped, either by calling stop() or stopping the associated executors
     // will be invoken on one of the server executors, but which one is not defined
