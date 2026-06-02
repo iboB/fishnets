@@ -33,7 +33,7 @@ class EchoSession final : public fishnets::WsConnectionHandler, public fishnets:
 public:
     std::optional<std::deque<Packet>> packets;
 
-    void onConnected(fishnets::WebSocketPtr ws, std::string_view target) override {
+    void onConnected(fishnets::WebSocketPtr ws, std::string_view) override {
         wsAttach(std::move(ws));
         wsReceive();
     }
