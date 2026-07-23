@@ -217,7 +217,7 @@ struct TestServer {
     xeq::context m_ctx;
     std::shared_ptr<fishnets::SslContext> m_sslCtx = createServerTestSslCtx();
     xeq::thread_runner m_runner;
-    uint32_t m_freeSessionId = 0;
+    std::atomic_uint32_t m_freeSessionId = 0;
 
     TestServer(size_t numThreads) {
         wsServeLocalhost(
