@@ -45,6 +45,8 @@ protected:
 
     // call to detach the WebSocket from this handler
     // only valid if no io operations are in progress (wsReceive, wsSend, wsClose)
+    // regarding not-yet-executed ws io tasks, use at your own risk
+    // unless the executor is stopped, they will still be executed
     WebSocketPtr wsDetach();
 
     // call to check if there are any io operations in progress (wsReceive, wsSend, wsClose)
