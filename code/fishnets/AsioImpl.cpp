@@ -458,6 +458,11 @@ struct ClientConnectorSsl final : public ClientConnectorT<RawWsSsl> {
             return failed(e, "ssl handshake");
         }
 
+        // as per beast docs:
+        // If the WebSocket stream is used with an encrypted SSL or TLS next layer
+        // [...] then the faster algorithm may be used.
+        // TODO: add this to the websocket options
+        m_ws.secure_prng(false);
         m_ws.next_layer().async_handshake(ssl::stream_base::client,
             beast::bind_front_handler(&ClientConnectorSsl::onReadyForWSHandshake, shared_from(this)));
     }
