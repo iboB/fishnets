@@ -19,7 +19,10 @@
 #include "HttpResponseSocket.hpp"
 
 #include <xeq/context.hpp>
+#include <xeq/context_facets.hpp>
+#include <xeq/context_facet_domain.hpp>
 #include <xeq/executor.hpp>
+#include <trex/facets/define.hpp>
 
 #if defined(_MSC_VER)
 #   pragma warning (disable: 4100)
@@ -63,20 +66,15 @@ using tcp = net::ip::tcp;
 
 namespace fishnets {
 
-struct XeqContextObject {
+struct FishnetsResolver {
     tcp::resolver resolver;
 };
+TREX_DEFINE_FACET(xeq::context_facet_domain, FishnetsResolver);
 
 tcp::resolver& getResolver(xeq::context& ctx) {
-    static constexpr std::string_view key = "fishnets";
-    auto obj = ctx.get_object(key);
-    if (obj) {
-        auto holder = static_cast<XeqContextObject*>(obj.get());
-        return holder->resolver;
-    }
-    auto holder = itlib::make_shared(XeqContextObject{tcp::resolver(ctx.as_asio_io_context())});
-    ctx.attach_object(key, holder);
-    return holder->resolver;
+    return ctx.facets().get_or_init([&ctx]() {
+        return itlib::make_shared(FishnetsResolver{tcp::resolver(ctx.as_asio_io_context())});
+    }).resolver;
 }
 
 using RawWs = ws::stream<tcp::socket>;
