@@ -1,7 +1,7 @@
 # Copyright (c) Borislav Stanimirov
 # SPDX-License-Identifier: MIT
 #
-cmake_minimum_required(VERSION 3.16 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.24 FATAL_ERROR)
 
 project(fishnets
     VERSION 1.0.0
@@ -9,11 +9,15 @@ project(fishnets
 )
 
 # cpm
+if(NOT CPM_SOURCE_CACHE AND NOT DEFINED ENV{CPM_SOURCE_CACHE})
+    set(CPM_SOURCE_CACHE "${CMAKE_SOURCE_DIR}/.cpm" CACHE PATH "CPM source cache")
+    message(STATUS "Setting cpm cache dir to: ${CPM_SOURCE_CACHE}")
+endif()
 include(./get_cpm.cmake)
 
 #######################################
 # cmake lib
-CPMAddPackage(gh:iboB/icm@1.5.6)
+CPMAddPackage(gh:iboB/icm@1.5.7)
 
 set(CMAKE_MODULE_PATH
     ${CMAKE_MODULE_PATH}
