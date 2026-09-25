@@ -97,7 +97,7 @@ class TestSenderSession final : public BasicSession {
     using BasicSession::BasicSession;
 
     void sendNext() {
-        auto& packet = packets[sendIndex++];
+        auto& packet = packets[sendIndex];
         if (packet.istext) wsSend(packet.text);
         else wsSend(as_bytes(std::span(packet.binary)));
     }
@@ -135,6 +135,7 @@ class TestSenderSession final : public BasicSession {
     }
 
     void wsCompletedSend() override {
+        ++sendIndex;
         if (sendIndex == packets.size())
         {
             closeIfDone();
