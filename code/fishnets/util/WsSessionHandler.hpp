@@ -77,6 +77,10 @@ protected:
     // the lifetime of the session handler itself will be extended until the corresponding wsReceived* is called
     void wsReceive(WebSocket::ByteSpan buf = {});
 
+    // get the websocket's internal growable receive buffer
+    // same restrictions as documented in WebSocket::recvBuffer apply
+    WebSocket::RecvBuffer& wsGetRecvBuffer() { return m_ws->recvBuffer; }
+
     // the buffer argument of these callbacks is the span provided to wsReceive (or a view of the internal buffer)
     // it will be resized to the size of the received data
     // complete will be true if the data completes the frame

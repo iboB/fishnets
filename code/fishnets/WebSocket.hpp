@@ -6,6 +6,7 @@
 #include <xeq/executor_ptr.hpp>
 #include <itlib/ufunction.hpp>
 #include <itlib/expected.hpp>
+#include <itlib/pod_vector.hpp>
 #include <string>
 #include <span>
 
@@ -83,6 +84,19 @@ public:
     virtual void setOptions(const WebSocketOptions& options) = 0;
 
     const xeq::executor_ptr& executor() const { return m_executor; }
+
+    // internal growable buffer used when recv is called with an empty span
+    // if this buffer is used (recv called with empty span):
+    // * TOUCHING THIS while the receive op is in progress WILL RESULT IN UB
+    // * you can reserve before calling recv to avoid excessive allocations
+    // * after the receive op completes, the buffer will contain the received data
+    //   and will be resized appropriately (equivalent to the span passed to the callback)
+    //   you can transfer ownership (with swap, exchange, or recast_take_from) to user code
+    // if this buffer is not used in recv (called with non-empty span), the library does not touch it
+    // and it can be used for any purpose
+    using RecvBuffer = itlib::pod_vector_noinit<std::byte>;
+    RecvBuffer recvBuffer;
+
 private:
     // sealed interface
     WebSocket();

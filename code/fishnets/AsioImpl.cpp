@@ -123,10 +123,45 @@ using RawWsSsl = ws::stream<ssl::stream<tcp::socket>>;
 WebSocket::WebSocket() = default;
 WebSocket::~WebSocket() = default;
 
+namespace {
+struct WsRecvBufAdapter {
+    WebSocket::RecvBuffer& vec;
+
+    using const_buffers_type = net::const_buffer;
+    using mutable_buffers_type = net::mutable_buffer;
+
+    size_t size() const noexcept { return vec.size(); }
+    size_t capacity() const noexcept { return vec.capacity(); }
+    size_t max_size() const noexcept { return vec.max_size(); }
+
+    net::mutable_buffer prepare(std::size_t n) {
+        auto oldSize = vec.size();
+        vec.resize(oldSize + n);
+        return net::buffer(vec.data() + oldSize, n);
+    }
+
+    void commit(std::size_t n) {
+        vec.resize(vec.size() - n);
+    }
+
+    void consume(std::size_t n) {
+        vec.erase(vec.begin(), vec.begin() + n);
+    }
+
+    net::mutable_buffer data() noexcept {
+        return net::buffer(vec.data(), vec.size());
+    }
+
+    net::const_buffer data() const noexcept {
+        return net::buffer(vec.data(), vec.size());
+    }
+};
+} // namespace
+
 struct WebSocketImpl : public WebSocket {
     using WebSocket::m_executor;
 
-    beast::flat_buffer m_growableBuf;
+    WsRecvBufAdapter m_recvBufAdapter{recvBuffer};
     ByteSpan m_userBuf;
 };
 
@@ -194,7 +229,9 @@ struct WebSocketImplT final : public WebSocketImpl {
 
             WebSocket::Packet packet;
             if (m_userBuf.empty()) {
-                WebSocket::ByteSpan span(static_cast<std::byte*>(m_growableBuf.data().data()), m_growableBuf.size());
+                //WebSocket::ByteSpan span(static_cast<std::byte*>(m_growableBuf.data().data()), m_growableBuf.size());
+                recvBuffer.resize(size);
+                WebSocket::ByteSpan span{recvBuffer};
                 packet.data = span;
             }
             else {
@@ -211,8 +248,8 @@ struct WebSocketImplT final : public WebSocketImpl {
 
         m_userBuf = span;
         if (m_userBuf.empty()) {
-            m_growableBuf.clear();
-            m_ws.async_read(m_growableBuf, std::move(onRead));
+            recvBuffer.clear();
+            m_ws.async_read(m_recvBufAdapter, std::move(onRead));
         }
         else {
             m_ws.async_read_some(net::buffer(m_userBuf.data(), m_userBuf.size()), std::move(onRead));
