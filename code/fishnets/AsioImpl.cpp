@@ -125,7 +125,7 @@ WebSocket::~WebSocket() = default;
 
 namespace {
 struct WsRecvBufAdapter {
-    WebSocket::RecvBuffer& vec;
+    RecvBuffer& vec;
 
     using const_buffers_type = net::const_buffer;
     using mutable_buffers_type = net::mutable_buffer;
@@ -220,7 +220,7 @@ struct WebSocketImplT final : public WebSocketImpl {
         return m_ws.is_open();
     }
 
-    void recv(WebSocket::ByteSpan span, WebSocket::RecvCb cb) override {
+    void recv(ByteSpan span, WebSocket::RecvCb cb) override {
         auto onRead = [this, cb = std::move(cb)](beast::error_code e, size_t size) {
             if (e) {
                 cb(itlib::unexpected(e.message()));
@@ -229,9 +229,8 @@ struct WebSocketImplT final : public WebSocketImpl {
 
             WebSocket::Packet packet;
             if (m_userBuf.empty()) {
-                //WebSocket::ByteSpan span(static_cast<std::byte*>(m_growableBuf.data().data()), m_growableBuf.size());
                 recvBuffer.resize(size);
-                WebSocket::ByteSpan span{recvBuffer};
+                ByteSpan span{recvBuffer};
                 packet.data = span;
             }
             else {

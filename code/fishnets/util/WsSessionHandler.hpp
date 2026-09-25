@@ -3,13 +3,16 @@
 //
 #pragma once
 #include "../API.h"
-#include "../WebSocket.hpp"
 #include "../WebSocketPtr.hpp"
+#include "../ByteSpan.hpp"
+#include "../RecvBuffer.hpp"
 
 #include <xeq/ufunc.hpp>
+#include <xeq/executor_ptr.hpp>
 #include <itlib/shared_from.hpp>
 #include <string_view>
 #include <optional>
+#include <string>
 
 namespace fishnets {
 
@@ -20,7 +23,8 @@ struct EndpointInfo;
 // wraps a WebSocket object and provides a callback interface for handling the session
 class FISHNETS_API WsSessionHandler : public itlib::enable_shared_from {
 public:
-    explicit WsSessionHandler(WebSocketPtr ws = {});
+    WsSessionHandler();
+    explicit WsSessionHandler(WebSocketPtr ws);
 
     WsSessionHandler(const WsSessionHandler&) = delete;
     WsSessionHandler& operator=(const WsSessionHandler&) = delete;
@@ -75,17 +79,17 @@ protected:
 
     // call to initiate a receive
     // the lifetime of the session handler itself will be extended until the corresponding wsReceived* is called
-    void wsReceive(WebSocket::ByteSpan buf = {});
-
-    // get the websocket's internal growable receive buffer
-    // same restrictions as documented in WebSocket::recvBuffer apply
-    WebSocket::RecvBuffer& wsGetRecvBuffer() { return m_ws->recvBuffer; }
+    void wsReceive(ByteSpan buf = {});
 
     // the buffer argument of these callbacks is the span provided to wsReceive (or a view of the internal buffer)
     // it will be resized to the size of the received data
     // complete will be true if the data completes the frame
     virtual void wsReceivedBinary(std::span<std::byte> binary, bool complete);
     virtual void wsReceivedText(std::span<char> text, bool complete);
+
+    // get the websocket's internal growable receive buffer
+    // same restrictions as documented in WebSocket::recvBuffer apply
+    RecvBuffer& wsRecvBuffer();
 
     // call to initiate a send
     // the lifetime of the session handler will be extended until the corresponding wsCompletedSend is called
@@ -121,7 +125,7 @@ private:
 
     bool m_autoReceive = false;
 
-    void doSend(WebSocket::ConstPacket packet);
+    void doSend(ConstByteSpan data, bool complete, bool text);
     void tryCallWsClosed();
 };
 

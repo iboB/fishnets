@@ -3,6 +3,7 @@
 //
 #include "WsSessionHandler.hpp"
 #include "../EndpointInfo.hpp"
+#include "../WebSocket.hpp"
 #include <xeq/executor.hpp>
 #include <cstdio>
 #include <stdexcept>
@@ -14,6 +15,8 @@ WsSessionHandler::WsSessionHandler(WebSocketPtr ws) : m_ws(std::move(ws)) {
         m_executor = m_ws->executor();
     }
 }
+
+WsSessionHandler::WsSessionHandler() : WsSessionHandler(nullptr) {}
 
 WsSessionHandler::~WsSessionHandler() = default;
 
@@ -86,7 +89,7 @@ void WsSessionHandler::wsClose() {
     });
 }
 
-void WsSessionHandler::wsReceive(WebSocket::ByteSpan buf) {
+void WsSessionHandler::wsReceive(ByteSpan buf) {
     if (!m_closeStatus.open()) return; // close pending
     if (m_closeStatus.recv != CloseStatus::none) {
         throw std::runtime_error("wsReceive called twice");
@@ -119,13 +122,17 @@ void WsSessionHandler::wsReceive(WebSocket::ByteSpan buf) {
     });
 }
 
-void WsSessionHandler::doSend(WebSocket::ConstPacket packet) {
+RecvBuffer& WsSessionHandler::wsRecvBuffer() {
+    return m_ws->recvBuffer;
+}
+
+void WsSessionHandler::doSend(ConstByteSpan data, bool complete, bool text) {
     if (!m_closeStatus.open()) return; // close pending
     if (m_closeStatus.send != CloseStatus::none) {
         throw std::runtime_error("wsSend called twice");
     }
     m_closeStatus.send = CloseStatus::active;
-    m_ws->send(packet, [this, pl = shared_from_this()](WebSocket::Result<void> res) {
+    m_ws->send({data, complete, text}, [this, pl = shared_from_this()](WebSocket::Result<void> res) {
         if (res) {
             m_closeStatus.send = CloseStatus::none;
             wsCompletedSend();
@@ -141,11 +148,11 @@ void WsSessionHandler::doSend(WebSocket::ConstPacket packet) {
 }
 
 void WsSessionHandler::wsSend(std::span<const std::byte> binary, bool complete) {
-    doSend({binary, complete, false});
+    doSend(binary, complete, false);
 
 }
 void WsSessionHandler::wsSend(std::string_view text, bool complete) {
-    doSend({as_bytes(std::span(text)), complete, true});
+    doSend(as_bytes(std::span(text)), complete, true);
 }
 
 EndpointInfo WsSessionHandler::wsGetEndpointInfo() const {

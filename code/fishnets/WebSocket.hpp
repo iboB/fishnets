@@ -3,10 +3,11 @@
 //
 #pragma once
 #include "API.h"
+#include "ByteSpan.hpp"
+#include "RecvBuffer.hpp"
 #include <xeq/executor_ptr.hpp>
 #include <itlib/ufunction.hpp>
 #include <itlib/expected.hpp>
-#include <itlib/pod_vector.hpp>
 #include <string>
 #include <span>
 
@@ -27,9 +28,6 @@ public:
     WebSocket& operator=(const WebSocket&) = delete;
 
     virtual bool connected() const = 0;
-
-    using ByteSpan = std::span<std::byte>;
-    using ConstByteSpan = std::span<const std::byte>;
 
     struct Packet {
         ByteSpan data;
@@ -94,7 +92,6 @@ public:
     //   you can transfer ownership (with swap, exchange, or recast_take_from) to user code
     // if this buffer is not used in recv (called with non-empty span), the library does not touch it
     // and it can be used for any purpose
-    using RecvBuffer = itlib::pod_vector_noinit<std::byte>;
     RecvBuffer recvBuffer;
 
 private:

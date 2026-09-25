@@ -10,6 +10,7 @@
 #include <fishnets/WsServe.hpp>
 #include <fishnets/WsConnect.hpp>
 #include <fishnets/WsConnectionHandler.hpp>
+#include <fishnets/WebSocket.hpp>
 
 #include <xeq/context.hpp>
 #include <xeq/thread_runner.hpp>

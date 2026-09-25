@@ -6,6 +6,7 @@
 #include <fishnets/WsServe.hpp>
 #include <fishnets/WsConnectionHandler.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
+#include <fishnets/WebSocket.hpp>
 
 #include <iostream>
 #include <thread>

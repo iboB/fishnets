@@ -3,6 +3,7 @@
 //
 #pragma once
 #include "API.h"
+#include "ByteSpan.hpp"
 #include <xeq/executor_ptr.hpp>
 #include <itlib/ufunction.hpp>
 #include <itlib/expected.hpp>
@@ -20,7 +21,6 @@ public:
 
     virtual bool connected() const = 0;
 
-    using ByteSpan = std::span<std::byte>;
     struct Packet {
         ByteSpan data;
         bool complete; // true if the data completes the response
