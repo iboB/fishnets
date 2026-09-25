@@ -107,9 +107,6 @@ public:
 
     void onConnected(fishnets::WebSocketPtr ws, std::string_view) override {
         wsAttach(std::move(ws));
-        wsSetAutoReceive(true);
-        wsReceive();
-
         wsSend(m_queue.front());
     }
 
@@ -121,10 +118,11 @@ public:
 
         const auto& newFront = m_queue.front();
         if (newFront == "local-close") {
+            wsReceive();
             wsClose();
         }
         else if (newFront == "local-expire") {
-            wsSetAutoReceive(false);
+            return;
         }
         else {
             wsSend(newFront);
@@ -133,6 +131,7 @@ public:
 
     void wsCompletedSend() final override {
         ++status;
+        wsReceive();
     }
 };
 
