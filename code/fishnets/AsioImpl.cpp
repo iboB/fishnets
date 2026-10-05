@@ -624,7 +624,12 @@ public:
     }
 
     void onAccept(tcp::acceptor& a, beast::error_code e, xeq::executor_ptr socketEx, tcp::socket socket) {
-        auto endpoint = EndpointInfo_fromTcp(a.local_endpoint());
+        // the acceptor endpoint becomes invalid as the server is shutting down
+        // in this case a.local_endpoint() will throw
+        // to prevent the useless exception, we give it an error_code output arg which we promptly ignore
+        // the actual error (which either caused the shutdown or was caused by it) is already in `e`
+        [[maybe_unused]] boost::system::error_code lpe;
+        auto endpoint = EndpointInfo_fromTcp(a.local_endpoint(lpe));
 
         if (e) {
             m_handler->m_server = {};
