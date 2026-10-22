@@ -95,7 +95,7 @@ void WsSessionHandler::wsReceive(ByteSpan buf) {
         throw std::runtime_error("wsReceive called twice");
     }
     m_closeStatus.recv = CloseStatus::active;
-    m_ws->recv(buf, [this, pl = shared_from_this()](WebSocket::Result<WebSocket::Packet> res) {
+    m_ws->recv(buf, [this, buf, pl = shared_from_this()](WebSocket::Result<WebSocket::Packet> res) {
         if (res) {
             m_closeStatus.recv = CloseStatus::none; // can receive again
 
@@ -109,7 +109,7 @@ void WsSessionHandler::wsReceive(ByteSpan buf) {
             }
 
             if (m_autoReceive) {
-                wsReceive();
+                wsReceive(buf);
             }
         }
         else {

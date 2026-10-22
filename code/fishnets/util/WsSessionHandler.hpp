@@ -60,6 +60,7 @@ protected:
     // this can be changed at any time and will affect the next possible receive operation
     // note that simply setting this does not initiate a receive
     // if you want a receive loop from the get go, set this to true and call wsReceive after the WebSocket is attached
+    // subsequent receives will reuse the (potentially empty = auto) span provided to the wsReceive call
     void wsSetAutoReceive(bool set = true) { m_autoReceive = set; }
     bool wsIsAutoReceiving() const { return m_autoReceive; }
 
