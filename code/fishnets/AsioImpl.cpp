@@ -5,6 +5,7 @@
 #include "WsConnect.hpp"
 #include "MakeHttpRequest.hpp"
 #include "MakeSimpleHttpRequest.hpp"
+#include "Resolve.hpp"
 
 #include "WebSocket.hpp"
 #include "WsConnectionHandler.hpp"
@@ -1112,6 +1113,57 @@ void makeSimpleHttpRequest(
             ctx, std::move(req), std::move(body), std::move(opts), {}, std::move(cb), sslCtx),
         net::detached
     );
+}
+
+void resolve(
+    xeq::context& ctx,
+    std::string_view host,
+    std::string_view service,
+    ResolveCb cb
+) {
+    auto& resolver = getResolver(ctx);
+    resolver.async_resolve(host, service,
+        [cb = std::move(cb)](beast::error_code e, tcp::resolver::results_type results) {
+            if (e) {
+                cb(itlib::unexpected(e.message()));
+                return;
+            }
+            std::vector<EndpointInfo> eps;
+            for (auto& ep : results) {
+                eps.push_back(EndpointInfo_fromTcp(ep.endpoint()));
+            }
+            cb(std::move(eps));
+        }
+    );
+}
+
+
+void resolve(
+    xeq::context& ctx,
+    std::string_view url,
+    ResolveCb cb
+) {
+    auto uriSplit = furi::uri_split::from_uri(url);
+    auto authSplit = furi::authority_split::from_authority(uriSplit.authority);
+
+    std::string_view service;
+    if (authSplit.port) {
+        service = authSplit.port;
+    }
+    else {
+        if (uriSplit.scheme == "http" || uriSplit.scheme == "ws") {
+            service = "80";
+        }
+        else if (uriSplit.scheme == "https" || uriSplit.scheme == "wss") {
+            service = "443";
+        }
+        else {
+            cb(itlib::unexpected(std::string("unsupported scheme: ") + std::string(uriSplit.scheme)));
+            return;
+        }
+    }
+
+    resolve(ctx, authSplit.host, service, std::move(cb));
 }
 
 } // namespace fishnets
