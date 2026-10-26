@@ -137,8 +137,7 @@ class TestSenderSession final : public BasicSession {
 
     void wsCompletedSend() override {
         ++sendIndex;
-        if (sendIndex == packets.size())
-        {
+        if (sendIndex == packets.size()) {
             closeIfDone();
             return;
         }
