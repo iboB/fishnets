@@ -104,7 +104,8 @@ class TestSenderSession final : public BasicSession {
 
     void closeIfDone() {
         if (sendIndex == packets.size() && receivedIndex == packets.size()) {
-            wsClose();
+            CHECK(wsClose());
+            CHECK_FALSE(wsClose());
         }
     }
 
@@ -145,6 +146,7 @@ class TestSenderSession final : public BasicSession {
     }
 
     void wsClosed(std::string) override {
+        CHECK_FALSE(wsClose());
         CHECK(receivedIndex == packets.size());
         CHECK(sendIndex == packets.size());
     }

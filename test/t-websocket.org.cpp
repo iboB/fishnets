@@ -41,7 +41,7 @@ public:
 
     void trySendNext() {
         if (packets->empty()) {
-            wsClose();
+            CHECK(wsClose());
         }
         else {
             auto& packet = packets->front();

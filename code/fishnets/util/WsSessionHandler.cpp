@@ -68,11 +68,10 @@ void WsSessionHandler::tryCallWsClosed() {
     wsClosed(std::move(*m_closeStatus.reason));
 }
 
-void WsSessionHandler::wsClose() {
-    if (!m_closeStatus.open()) return; // close pending
-    if (m_closeStatus.close != CloseStatus::none) {
-        throw std::runtime_error("wsClose called twice");
-    }
+bool WsSessionHandler::wsClose() {
+    if (!m_closeStatus.open()) return false; // close pending
+    if (m_closeStatus.close != CloseStatus::none) return false;
+
     m_closeStatus.close = CloseStatus::active;
     m_ws->close([this, pl = shared_from_this()](WebSocket::Result<void> res) {
         m_closeStatus.close = CloseStatus::closed;
@@ -87,6 +86,7 @@ void WsSessionHandler::wsClose() {
         }
         tryCallWsClosed();
     });
+    return true;
 }
 
 void WsSessionHandler::wsReceive(ByteSpan buf) {

@@ -76,7 +76,14 @@ protected:
 
     // call to initiate the close of the session
     // will result in wsClosed being called
-    void wsClose();
+    // unlike wsSend and wsReceive, this is SAFE to call multiple times before a corresponding wsClosed is called
+    // return:
+    // - true: a close is scheduled by this call
+    // - false: a close is not scheduled by this call which may be because of:
+    //      - session is already closed (wsClose called)
+    //      - session is about to close because failure to send or receive (wsClose imminent)
+    //      - wsClose was called previously (wsClose imminent)
+    bool wsClose();
 
     // call to initiate a receive
     // the lifetime of the session handler itself will be extended until the corresponding wsReceived* is called

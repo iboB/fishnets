@@ -36,7 +36,7 @@ class EchoSession final : public fishnets::WsConnectionHandler, public fishnets:
         REQUIRE(complete);
         auto str = std::string(text.begin(), text.end());
         if (str == "remote-close") {
-            wsClose();
+            CHECK(wsClose());
         }
         else if (str == "remote-expire") {
             wsSetAutoReceive(false);
@@ -119,7 +119,7 @@ public:
         const auto& newFront = m_queue.front();
         if (newFront == "local-close") {
             wsReceive();
-            wsClose();
+            CHECK(wsClose());
         }
         else if (newFront == "local-expire") {
             return;
