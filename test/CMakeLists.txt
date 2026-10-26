@@ -28,6 +28,8 @@ macro(dual_test test)
     ssl_test(${test})
 endmacro()
 
+non_ssl_test(resolve)
+
 dual_test(ws-SimpleClientServer)
 dual_test(ws-ClientReconnect)
 ssl_test(websocket.org)
