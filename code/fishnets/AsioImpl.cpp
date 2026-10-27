@@ -1093,6 +1093,15 @@ request_t requestFromDesc(const HttpRequestDesc& desc) {
     return req;
 }
 
+void adjustRequestSslCtx(const HttpRequestDesc& desc, SslContext*& sslCtx) {
+    if (desc.scheme == HttpRequestDesc::HTTP) {
+        sslCtx = nullptr;
+    }
+    else if (desc.scheme == HttpRequestDesc::HTTPS && !sslCtx) {
+        throw std::runtime_error("missing ssl ctx for https request");
+    }
+}
+
 } // namespace
 
 void makeHttpRequest(
@@ -1103,10 +1112,7 @@ void makeHttpRequest(
     SslContext* sslCtx
 ) {
     auto req = requestFromDesc(desc);
-
-    if (desc.scheme == HttpRequestDesc::HTTP) {
-        sslCtx = nullptr;
-    }
+    adjustRequestSslCtx(desc, sslCtx);
 
     net::co_spawn(
         ctx.as_asio_io_context(),
@@ -1125,10 +1131,7 @@ void makeSimpleHttpRequest(
     SslContext* sslCtx
 ) {
     auto req = requestFromDesc(desc);
-
-    if (desc.scheme == HttpRequestDesc::HTTP) {
-        sslCtx = nullptr;
-    }
+    adjustRequestSslCtx(desc, sslCtx);
 
     net::co_spawn(
         ctx.as_asio_io_context(),

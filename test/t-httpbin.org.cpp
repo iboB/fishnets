@@ -5,6 +5,7 @@
 #include <fishnets/MakeHttpRequest.hpp>
 #include <fishnets/MakeSimpleHttpRequest.hpp>
 #include <doctest/doctest.h>
+#include "TestSslCtx.hpp"
 
 #if HAVE_SSL
 #define SCHEME "https"
@@ -63,13 +64,16 @@ using SimpleResult = itlib::expected<std::string, std::string>;
 TEST_CASE("just get") {
     xeq::context ctx;
     SimpleResult responseBody;
+    auto sslCtx = createClientTestSslCtx();
     fishnets::makeSimpleHttpRequest(
         ctx,
         {"GET " SCHEME "://httpbin.org/bytes/128?seed=42"},
         {/*empty body*/},
         [&](SimpleResult result) {
             responseBody = std::move(result);
-        }
+        },
+        {},
+        sslCtx.get()
     );
 
     ctx.run();
