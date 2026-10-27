@@ -934,7 +934,8 @@ struct HttpConnectorSsl final : public HttpConnectorT<beast::ssl_stream<beast::t
     using HttpConnectorT<beast::ssl_stream<beast::tcp_stream>>::HttpConnectorT;
     virtual net::awaitable<void> handshake(std::string_view host) override {
         // Set SNI Hostname (many hosts need this to handshake successfully)
-        if (!SSL_set_tlsext_host_name(m_stream.native_handle(), host.data())) {
+        std::string hostStr(host); // arg is not necessarily zero-terminated
+        if (!SSL_set_tlsext_host_name(m_stream.native_handle(), hostStr.c_str())) {
             auto e = beast::error_code(static_cast<int>(::ERR_get_error()), net::error::get_ssl_category());
             throw beast::system_error(e);
         }
