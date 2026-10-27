@@ -803,7 +803,9 @@ void wsConnect(xeq::context& ctx, WsConnectionHandlerPtr handler, std::string_vi
             &ctx,
             handler,
             sslCtx,
-            host = std::string(authSplit.url_hostname),
+            // note that we use the full host name here (and not the potentially stripped down url_hostname)
+            // this string is used for handshakes, which do require brackets on raw ipv6 ips
+            host = std::string(authSplit.host),
             target = std::string(uriSplit.req_path)
         ](beast::error_code e, tcp::resolver::results_type results) mutable {
             if (e) {
