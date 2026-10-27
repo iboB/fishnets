@@ -41,7 +41,7 @@ TEST_CASE("resolve ip") {
     };
 
     check_failure(resolveSync("foo:1.2.3.4:5"), "unsupported scheme: foo");
-    check_failure(resolveSync("1.2.3", uint16_t(4)));
+    check_failure(resolveSync("300.400.500.600", uint16_t(4)));
 }
 
 TEST_CASE("resolve address") {
