@@ -127,34 +127,56 @@ WebSocket::~WebSocket() = default;
 namespace {
 struct WsRecvBufAdapter {
     RecvBuffer& vec;
+    size_t inEnd; // end of input sequence
+
+    explicit WsRecvBufAdapter(RecvBuffer& v)
+        : vec(v)
+        , inEnd(0)
+    {}
 
     using const_buffers_type = net::const_buffer;
     using mutable_buffers_type = net::mutable_buffer;
 
-    size_t size() const noexcept { return vec.size(); }
+    size_t size() const noexcept { return inEnd; }
     size_t capacity() const noexcept { return vec.capacity(); }
     size_t max_size() const noexcept { return vec.max_size(); }
 
     net::mutable_buffer prepare(std::size_t n) {
-        auto oldSize = vec.size();
-        vec.resize(oldSize + n);
-        return net::buffer(vec.data() + oldSize, n);
+        vec.resize(inEnd + n);
+        return net::buffer(vec.data() + inEnd, n);
     }
 
     void commit(std::size_t n) {
-        vec.resize(vec.size() - n);
+        auto newSize = inEnd + n;
+        if (newSize > vec.size()) {
+            newSize = vec.size();
+        }
+        vec.resize(newSize);
+        inEnd = newSize;
     }
 
     void consume(std::size_t n) {
+        if (n > inEnd) {
+            n = inEnd;
+        }
+        inEnd -= n;
         vec.erase(vec.begin(), vec.begin() + n);
     }
 
     net::mutable_buffer data() noexcept {
-        return net::buffer(vec.data(), vec.size());
+        return net::buffer(vec.data(), inEnd);
     }
 
     net::const_buffer data() const noexcept {
-        return net::buffer(vec.data(), vec.size());
+        return net::buffer(vec.data(), inEnd);
+    }
+
+    net::const_buffer cdata() const noexcept {
+        return data();
+    }
+
+    void reset() noexcept {
+        inEnd = 0;
     }
 };
 } // namespace
@@ -247,7 +269,7 @@ struct WebSocketImplT final : public WebSocketImpl {
 
         m_userBuf = span;
         if (m_userBuf.empty()) {
-            recvBuffer.clear();
+            m_recvBufAdapter.reset();
             m_ws.async_read(m_recvBufAdapter, std::move(onRead));
         }
         else {

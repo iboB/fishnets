@@ -54,8 +54,10 @@ struct Packet {
 const std::vector<Packet> packets = {
     Packet{true, "client 0", {}},
     Packet{true, "client 1", {}},
+    Packet{true, std::string(3000, 'x'), {}},
     Packet{false, {}, {1, 2, 3}},
     Packet{false, {}, {5, 6, 7}},
+    Packet{false, {}, std::vector<uint8_t>(3000, uint8_t(42))},
 };
 
 enum class Role {
