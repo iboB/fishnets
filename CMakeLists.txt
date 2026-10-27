@@ -78,7 +78,7 @@ if(NOT TARGET Boost::beast)
     add_library(Boost::beast ALIAS Boost::boost)
 endif()
 
-CPMAddPackage(gh:iboB/furi@1.2.2)
+CPMAddPackage(gh:iboB/furi@1.2.3)
 CPMAddPackage(gh:iboB/xeq@0.1.3)
 
 #######################################

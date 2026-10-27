@@ -777,12 +777,12 @@ void wsConnect(xeq::context& ctx, WsConnectionHandlerPtr handler, std::string_vi
     }
 
     auto& resolver = getResolver(ctx);
-    resolver.async_resolve(authSplit.host, port,
+    resolver.async_resolve(authSplit.url_hostname, port,
         [
             &ctx,
             handler,
             sslCtx,
-            host = std::string(authSplit.host),
+            host = std::string(authSplit.url_hostname),
             target = std::string(uriSplit.req_path)
         ](beast::error_code e, tcp::resolver::results_type results) mutable {
             if (e) {
@@ -1163,7 +1163,7 @@ void resolve(
         }
     }
 
-    resolve(ctx, authSplit.host, service, std::move(cb));
+    resolve(ctx, authSplit.url_hostname, service, std::move(cb));
 }
 
 } // namespace fishnets
