@@ -241,9 +241,8 @@ struct WebSocketImplT final : public WebSocketImpl {
             packet.complete = m_ws.is_message_done();
             packet.text = m_ws.got_text();
 
-            cb(std::move(packet));
-
             m_userBuf = {};
+            cb(std::move(packet));
         };
 
         m_userBuf = span;
