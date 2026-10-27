@@ -72,6 +72,8 @@ bool WsSessionHandler::wsClose() {
     if (!m_closeStatus.open()) return false; // close pending
     if (m_closeStatus.close != CloseStatus::none) return false;
 
+    m_autoReceive = false;
+
     m_closeStatus.close = CloseStatus::active;
     m_ws->close([this, pl = shared_from_this()](WebSocket::Result<void> res) {
         m_closeStatus.close = CloseStatus::closed;

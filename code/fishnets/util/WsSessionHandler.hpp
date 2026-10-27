@@ -76,6 +76,7 @@ protected:
 
     // call to initiate the close of the session
     // will result in wsClosed being called
+    // as a convenience, also sets auto-receive to false
     // unlike wsSend and wsReceive, this is SAFE to call multiple times before a corresponding wsClosed is called
     // return:
     // - true: a close is scheduled by this call
