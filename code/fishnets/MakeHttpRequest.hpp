@@ -5,6 +5,7 @@
 #include "API.h"
 #include "HttpRequestDesc.hpp"
 #include "HttpMsgBody.hpp"
+#include "HttpRequestOptions.hpp"
 #include "HttpResponseHandlerPtr.hpp"
 
 namespace xeq { class context; }
@@ -18,6 +19,7 @@ FISHNETS_API void makeHttpRequest(
     const HttpRequestDesc& desc,
     ConstHttpMsgBody body,
     HttpResponseHandlerPtr handler,
+    HttpRequestOptions opts = {},
     SslContext* sslCtx = nullptr
 );
 

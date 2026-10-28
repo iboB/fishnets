@@ -1111,6 +1111,7 @@ void makeHttpRequest(
     const HttpRequestDesc& desc,
     ConstHttpMsgBody body,
     HttpResponseHandlerPtr handler,
+    HttpRequestOptions opts,
     SslContext* sslCtx
 ) {
     auto req = requestFromDesc(desc);
@@ -1119,7 +1120,7 @@ void makeHttpRequest(
     net::co_spawn(
         ctx.as_asio_io_context(),
         Context_httpRequest<false>(
-            ctx, std::move(req), std::move(body), handler->getOptions(), handler, {}, sslCtx),
+            ctx, std::move(req), std::move(body), std::move(opts), handler, {}, sslCtx),
         net::detached
     );
 }
