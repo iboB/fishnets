@@ -86,6 +86,12 @@ protected:
         CHECK(target == SessionTargetFixture::target);
     }
 
+    void checkReceiveSpan(std::span<const std::byte> span) {
+        auto& buf = wsRecvBuffer();
+        CHECK(buf.size() == span.size());
+        CHECK(buf.data() == span.data());
+    }
+
     // connection handler
     void onConnected(fishnets::WebSocketPtr ws, std::string_view target) override {
         wsAttach(std::move(ws));
@@ -121,6 +127,7 @@ class TestSenderSession final : public BasicSession {
     void wsReceivedBinary(std::span<std::byte> binary, bool complete) override {
         REQUIRE(receivedIndex < packets.size());
         CHECK(complete);
+        checkReceiveSpan(binary);
         CHECK((packets[receivedIndex] == binary));
         ++receivedIndex;
         closeIfDone();
@@ -130,6 +137,7 @@ class TestSenderSession final : public BasicSession {
     void wsReceivedText(std::span<char> text, bool complete) override {
         REQUIRE(receivedIndex < packets.size());
         CHECK(complete);
+        checkReceiveSpan(as_bytes(text));
         std::string_view str(text.data(), text.size());
         CHECK(packets[receivedIndex] == str);
         ++receivedIndex;
@@ -170,6 +178,7 @@ class TestEchoSession final : public BasicSession {
     void wsReceivedBinary(std::span<std::byte> binary, bool complete) override {
         std::lock_guard l(*m_seqCheck);
         CHECK(complete);
+        checkReceiveSpan(binary);
         REQUIRE(receivedIndex < packets.size());
         CHECK((packets[receivedIndex] == binary));
         sendQueue.push_back(receivedIndex);
@@ -180,6 +189,7 @@ class TestEchoSession final : public BasicSession {
     void wsReceivedText(std::span<char> text, bool complete) override {
         std::lock_guard l(*m_seqCheck);
         CHECK(complete);
+        checkReceiveSpan(as_bytes(text));
         REQUIRE(receivedIndex < packets.size());
         std::string_view str(text.data(), text.size());
         CHECK(packets[receivedIndex] == str);
