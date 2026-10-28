@@ -11,6 +11,7 @@ icm_add_lib(fishnets FISHNETS
 
     util/WsSessionHandler.cpp
     util/WsSessionHandlerWithSendQueue.cpp
+    util/WsSimpleServerHandler.cpp
 )
 add_library(fishnets::fishnets ALIAS fishnets)
 

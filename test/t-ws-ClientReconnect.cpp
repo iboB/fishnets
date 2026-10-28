@@ -7,6 +7,7 @@
 
 #include <fishnets/WsServerHandler.hpp>
 #include <fishnets/util/WsSessionHandlerWithSendQueue.hpp>
+#include <fishnets/util/WsSimpleServerHandler.hpp>
 #include <fishnets/WsServe.hpp>
 #include <fishnets/WsConnect.hpp>
 #include <fishnets/WsConnectionHandler.hpp>
@@ -56,7 +57,7 @@ struct EchoServer {
         wsServeLocalhost(
             m_ctx,
             Accept_Port,
-            std::make_shared<fishnets::SimpleServerHandler>([](fishnets::WsServerConnectionPtr c) {
+            std::make_shared<fishnets::WsSimpleServerHandler>([](fishnets::WsServerConnectionPtr c) {
                 c->accept(std::make_shared<EchoSession>());
             }),
             m_sslCtx.get()
@@ -64,7 +65,7 @@ struct EchoServer {
         wsServeLocalhost(
             m_ctx,
             Deny_Port,
-            std::make_shared<fishnets::SimpleServerHandler>([](fishnets::WsServerConnectionPtr c) {
+            std::make_shared<fishnets::WsSimpleServerHandler>([](fishnets::WsServerConnectionPtr c) {
                 auto t = std::chrono::steady_clock::now().time_since_epoch().count();
                 // actively reject about 1/2 of the session
                 // auto (passively, by virtue of expire) reject the others

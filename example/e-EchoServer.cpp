@@ -6,6 +6,7 @@
 #include <fishnets/WsServe.hpp>
 #include <fishnets/WsConnectionHandler.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
+#include <fishnets/util/WsSimpleServerHandler.hpp>
 #include <fishnets/WebSocket.hpp>
 
 #include <iostream>
@@ -55,7 +56,7 @@ int main() {
     wsServe(
         ctx,
         {fishnets::IPv4, 7654},
-        std::make_shared<fishnets::SimpleServerHandler>([](fishnets::WsServerConnectionPtr c) {
+        std::make_shared<fishnets::WsSimpleServerHandler>([](fishnets::WsServerConnectionPtr c) {
             c->accept(std::make_shared<EchoServerSession>());
         })
     );

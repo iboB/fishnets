@@ -8,6 +8,7 @@
 #include <fishnets/WsServerHandler.hpp>
 #include <fishnets/WsConnectionHandler.hpp>
 #include <fishnets/util/WsSessionHandler.hpp>
+#include <fishnets/util/WsSimpleServerHandler.hpp>
 #include <fishnets/WsServe.hpp>
 #include <fishnets/WsConnect.hpp>
 #include <fishnets/WebSocket.hpp>
@@ -238,7 +239,7 @@ struct TestServer {
         wsServeLocalhost(
             m_ctx,
             Test_Port,
-            std::make_shared<fishnets::SimpleServerHandler>([this](fishnets::WsServerConnectionPtr c) {
+            std::make_shared<fishnets::WsSimpleServerHandler>([this](fishnets::WsServerConnectionPtr c) {
                 CHECK(c->localEndpointInfo().address == "127.0.0.1");
                 CHECK(c->localEndpointInfo().port == Test_Port);
                 CHECK(c->getRemoteEndpointInfo().address == "127.0.0.1");

@@ -3,7 +3,6 @@
 //
 #pragma once
 #include "WsServerConnection.hpp"
-#include <functional>
 #include <string>
 
 namespace fishnets {
@@ -27,7 +26,7 @@ public:
     virtual void onError(const EndpointInfo& local, std::string msg);
 
     // called when the server is stopped, either by calling stop() or stopping the associated executors
-    // will be invoken on one of the server executors, but which one is not defined
+    // will be invoked on one of the server executors, but which one is not defined
     // the default implementation does nothing
     virtual void onStopped();
 
@@ -41,15 +40,4 @@ private:
     std::weak_ptr<impl::WsServer> m_server;
 };
 
-class SimpleServerHandler : public WsServerHandler {
-public:
-    using AcceptFunc = std::function<void(WsServerConnectionPtr)>;
-    AcceptFunc accept;
-
-    SimpleServerHandler(AcceptFunc f) : accept(std::move(f)) {}
-
-    virtual void onAccept(WsServerConnectionPtr connection) final override {
-        accept(std::move(connection));
-    }
-};
 } // namespace fishnets
