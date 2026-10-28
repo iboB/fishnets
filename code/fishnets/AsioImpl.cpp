@@ -865,12 +865,13 @@ struct HttpResponseSocketT final : public HttpResponseSocketImpl {
                 return;
             }
 
-            cb(Packet{
+            Packet result = {
                 .data = m_dataBuf.subspan(0, size),
                 .complete = m_parser.is_done()
-            });
-
+            };
             m_dataBuf = {};
+
+            cb(std::move(result));
         };
 
         m_dataBuf = span;
